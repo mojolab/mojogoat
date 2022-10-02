@@ -1,8 +1,10 @@
 # MojoGOAT - A Graph Of All Things
 
 ## Overview
+
 GOATs help structure information sematically by taking an ontological rather than a taxonomical approach. 
-In this implementation of the GOAT, we take the semantic structure: <source><story><target><date> - i.e. a quad
+In this implementation of the GOAT, we use a "quad" as the semantic structure: `<source><story><target><date>`
+
 A set of quads can be represented as a table, a CSV, a plain delimited text, or a more complex data structure
 The GOAT takes a set of quads and sets up a way to feed it into a neo4j graph database using python bindings. The graph data structure, as well as the simplified underlying quad storage can be queried using a simple REST API
 
