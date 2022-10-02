@@ -5,7 +5,6 @@ API to parse recieve messages and parse GOAT commands
 # TODO: #2 FEATURE - Add a command to process meeting notes
 # TODO: #3 FEATURE - Add a command to delete new lines by message reply
 # TODO: #4 OPTIMIZE - Standardize command function nomencalture and taxonomy
-# TODO: #5 ARCHITECTURE - Shift to reading all constants from config files
 # TODO: #6 ARCHITECTURE - Read labels from a schema file
 # TODO: #7 ARCHITECTURE - Read object schemas from a schema file
 # TODO: #8 ARCHITECTURE - Use appropriate stores for appropriate data - line records for relationships and doc records on entities
@@ -20,9 +19,10 @@ from mojogoat.utils import *
 from mojogoat.goat import *
 
 herd_config=read_herd_config(sys.argv[1])
-herdroot=herd_config['herdroot']
-goatlog=os.path.join(herdroot,"goatlog")
+goatpen=herd_config['goatpen']
+goatlog=os.path.join(goatpen,"goatlog")
 herd=get_goats(herd_config)
+global curgoat
 curgoat=herd[0]
 
 app = Flask(__name__)
@@ -42,6 +42,7 @@ def listener():
 
 
 def set_current_goat(goatname):
+    global curgoat
     for goat in herd:
         if goat.goatname==goatname:
             curgoat=goat

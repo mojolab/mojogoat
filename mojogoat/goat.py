@@ -35,6 +35,7 @@ class Goat:
             for token in tokens:
                 searchcommand = searchcommand + "| grep " + token + " "
             print(searchcommand)
+
             responselines=os.popen(searchcommand).read().lstrip().rstrip().split("\n")
             responselines=[line for line in responselines if line != ""]    
             return responselines
@@ -46,14 +47,18 @@ class Goat:
                 for token in tokens:
                     if token!="":
                         searchcommand = searchcommand + "| grep " + token + " "
+            #searchcommand+=" | head 500"
             responselines=os.popen(searchcommand).read().lstrip().rstrip().split("\n")
-            return responselines
+            return responselines[:50]
 
     def feed_goat(self,feed):
         feedlines=feed.lstrip().rstrip().split("\n")
         print(feedlines)
         quadlist=[]
         for line in feedlines:
+            if len(line.split(" "))<3:
+                print("line too short")
+                break
             source=line.split(" ")[0]
             target=line.split(" ")[-1]
             story=line.replace(source,"").replace(target,"").lstrip().rstrip()
@@ -66,16 +71,16 @@ class Goat:
         return quadlist
 
     
-    def tell_goat(tell,apply_to=None):
+    def tell_goat(self,tell,apply_to=None):
         if re.match(r"pull", tell):
             try:
-                output=os.popen("cd /opt/mojogoat && git pull && cd").read().strip()
+                output=os.popen("cd {} && git pull && cd".format(self.goatpath)).read().strip()
                 return output
             except Exception as e:
                 return str(e)
         if re.match(r"push", tell):
             try:
-                output=os.popen("cd /opt/mojogoat && git add * && git commit -a -m 'auto commit' && git push && cd").read().strip()
+                output=os.popen("cd {} && git add * && git commit -a -m 'auto commit' && git push && cd".format(self.goatpath)).read().strip()
                 return output
             except Exception as e:
                 return str(e)
