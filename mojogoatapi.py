@@ -14,13 +14,15 @@ from flask import Flask, request, jsonify
 import io, os, re, sys
 from jmespath import search
 import requests
+from sqlalchemy import outparam
 
 from mojogoat.utils import *
 from mojogoat.goat import *
-
+global herd_config
 herd_config=read_herd_config(sys.argv[1])
 goatpen=herd_config['goatpen']
 goatlog=os.path.join(goatpen,"goatlog")
+global herd
 herd=get_goats(herd_config)
 global curgoat
 curgoat=herd[0]
@@ -43,11 +45,35 @@ def listener():
 
 def set_current_goat(goatname):
     global curgoat
+    global herd
+    global herd_config
+    herd=get_goats(herd_config)
     for goat in herd:
         if goat.goatname==goatname:
             curgoat=goat
             return "Current goat is now {}".format(curgoat.goatname)
     return "No such goat in the herd"
+
+def add_goat(goatrepo):
+    global herd
+    global herd_config
+    herd=get_goats(herd_config)
+    newgoatname=goatrepo.split("/")[-1]
+    output=os.popen("cd {} && git clone {}".format(goatpen,goatrepo)).read().lstrip().rstrip()
+    print(output)
+    goatconfig={
+        "goatname":newgoatname,
+        "goatpath":os.path.join(goatpen,newgoatname),
+        "goatdesc":"{}".format(newgoatname)
+    }
+    print(goatconfig)
+    newgoat=Goat(goatconfig)
+    print(newgoat.goatname)
+    herd.append(newgoat)
+    herd_config['goatlist'].append(goatconfig)
+    with open(sys.argv[1],'w') as f:
+        json.dump(herd_config,f)
+    return newgoat
 
 def process_message(message):
     message['response']=["Me-eh!"]
@@ -72,6 +98,13 @@ def process_message(message):
         if "apply_to" in message.keys() and message['apply_to'] is not None:
             newgoat=message['apply_to']
         message['response']=[set_current_goat(newgoat)]
+        message['gtype']="commandherd"
+
+    if re.match(r"HERD!>newgoat",message['text']):
+        newgoatrepo=message['text'].replace("HERD!>newgoat","").lstrip().rstrip()
+        newgoat=add_goat(newgoatrepo)
+
+        message['response']=[set_current_goat(newgoat.goatname)]
         message['gtype']="commandherd"
     
     if re.match(r"GOAT\?>",message['text']):
