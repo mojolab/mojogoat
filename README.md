@@ -16,8 +16,34 @@ The GOAT takes a set of quads and sets up a way to feed it into a neo4j graph da
 3. When a GOAT gets too fat, make biryani
 
 
-## Docker Start Command
+## Set up the GOATPen
+
+[GOATPen Docker Image](https://hub.docker.com/r/arjunvenkatraman/goatpen)
+
+Install Docker on your machine, then use a terminal to run the following command
+
+```
+docker pull -a arjunvenkatraman/goatpen
+```
+
+Then start a container using the following command
 
 ```
 docker run  -it -p 8888:8888 -p 5001:5001  --mount type=bind,source=$pwd/xpal-data,target=/opt/xpal-data arjunvenkatraman/goatpen:latest
 ```
+
+Attach a shell to the running container to get a command line 
+
+
+## GOAT API
+
+The GOAT API allows for interaction with the GOATs you have access to. To start the API attach a terminal to the running docker container and run the following command:
+
+```
+cd /opt/xpal-data/mojogoat
+python3 mojogoatapi.py
+```
+
+The API should now be accessible at http://localhost:5001
+
+You can use the Postman collection included with the repository (in the `postman` folder) to test the API
