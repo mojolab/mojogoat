@@ -121,10 +121,15 @@ def process_message(message):
         # Feed the goat a triple
         message['response']=curgoat.tell_goat(message['tell'], apply_to)
 
-    if re.match(r"GOAT3>",message['text']):
+    if re.match(r"GOAT3>addrels",message['text']):
         message['gtype']="goatfeed"
-        message['feed']=message['text'][6:].lstrip().rstrip()
+        message['feed']=message['text'][13:].lstrip().rstrip()
         message['response']=curgoat.feed_goat(message['feed'])
+
+    if re.match(r"GOAT3>addnode",message['text']):
+        message['gtype']="goatfeed"
+        message['feed']=message['text'][13:].lstrip().rstrip()
+        message['response']=curgoat.add_node(message['feed'])
     return message
 
 if __name__ == '__main__':

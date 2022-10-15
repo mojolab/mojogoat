@@ -26,7 +26,7 @@ class Goat:
     # function to parse goatqueries
     def ask_goat(self,query):
         #if query starts with "search" do something
-        if re.match(r"search", query):
+        if re.match(r"searchrels", query):
             tokens=query.replace("search","").lstrip().rstrip().split(" ")
             with open(os.path.join(self.goatpath,"goatrels.gq"),"r") as f:
                 latestfile=f.read().lstrip().rstrip()
@@ -39,8 +39,8 @@ class Goat:
             responselines=os.popen(searchcommand).read().lstrip().rstrip().split("\n")
             responselines=[line for line in responselines if line != ""]    
             return responselines
-        if re.match(r"shownew", query):
-            tokens=query.replace("shownew","").lstrip().rstrip().split(" ")
+        if re.match(r"shownewrels", query):
+            tokens=query.replace("shownewrels","").lstrip().rstrip().split(" ")
             curfile=os.path.join(self.goatpath,"newgrass.gq")
             searchcommand="cat {} ".format(curfile)
             if len(tokens)>0:
@@ -50,6 +50,22 @@ class Goat:
             #searchcommand+=" | head 500"
             responselines=os.popen(searchcommand).read().lstrip().rstrip().split("\n")
             return responselines[:50]
+        if re.match(r"searchnode", query):
+            tokens=query.replace("searchnode","").lstrip().rstrip().split(" ")
+            searchresults=[]
+            for token in tokens:
+                searchcommand="find {} -name '*{}*'".format(os.path.join(self.goatpath,"nodes"),token)
+                responselines=[os.path.split(line)[1] for line in os.popen(searchcommand).read().lstrip().rstrip().split("\n")]
+                searchresults.extend(responselines)
+                #searchresults+=os.popen().read().lstrip().rstrip().split("\n")
+            return searchresults
+        if re.match(r"getnode", query):
+            nodeid=query.replace("getnode","").lstrip().rstrip()
+            print("Getting node {}".format(query))
+            if os.path.exists(os.path.join(self.goatpath,"nodes",nodeid)): 
+                print("Node found")
+                with open(os.path.join(self.goatpath,"nodes",query.replace("getnode","").lstrip().rstrip()),'r') as f:
+                    return json.dumps(json.loads(f.read()))
 
     def feed_goat(self,feed):
         feedlines=feed.lstrip().rstrip().split("\n")
@@ -92,3 +108,31 @@ class Goat:
                 return output
             except Exception as e:
                 return str(e)
+    def add_node(self,node):
+        # add a node to the goat
+        # first check if node exists
+        nodedict={}
+        if "{" in node:
+            try:
+                nodedict=json.loads(node)
+            except Exception as e:
+                return str(e)
+        else:
+            nodelines=node.lstrip().rstrip().split("\n")
+            for line in nodelines:
+                key=line.split("=")[0].lstrip().rstrip()
+                value=line.split("=")[1].lstrip().rstrip()
+                nodedict[key]=value
+        if "nodeid" in nodedict.keys():
+            if os.path.exists(os.path.join(self.goatpath,"nodes",nodedict['nodeid'])):
+                with open(os.path.join(self.goatpath,"nodes",nodedict['nodeid']),'r') as f:
+                    oldnode=json.loads(f.read())
+                for key in nodedict.keys():
+                    oldnode[key]=nodedict[key]
+                with open(os.path.join(self.goatpath,"nodes",nodedict['nodeid']),'w') as f:
+                    f.write(json.dumps(oldnode))
+                return "Updated node \n {}".format(nodedict)    
+            else:
+                with open(os.path.join(self.goatpath,"nodes",nodedict['nodeid']),'w') as f:
+                    f.write(json.dumps(nodedict))
+                return(json.dumps(nodedict))
