@@ -27,7 +27,7 @@ class Goat:
     def ask_goat(self,query):
         #if query starts with "search" do something
         if re.match(r"searchrels", query):
-            tokens=query.replace("search","").lstrip().rstrip().split(" ")
+            tokens=query.replace("searchrels","").lstrip().rstrip().split(" ")
             with open(os.path.join(self.goatpath,"goatrels.gq"),"r") as f:
                 latestfile=f.read().lstrip().rstrip()
             curfile=os.path.join(self.goatpath,latestfile)
