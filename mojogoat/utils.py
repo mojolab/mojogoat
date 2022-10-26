@@ -12,3 +12,5 @@ def get_goats(herd_config):
     for goat in herd_config['goatlist']:
         goats.append(Goat(goat))
     return goats
+
+
