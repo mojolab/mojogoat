@@ -136,3 +136,33 @@ class Goat:
                 with open(os.path.join(self.goatpath,"nodes",nodedict['nodeid']),'w') as f:
                     f.write(json.dumps(nodedict))
                 return(json.dumps(nodedict))
+    def all_nodes(self):
+        nodelist=[]
+        for nodefile in [os.path.join(self.goatpath,"nodes",node) for node in os.listdir(os.path.join(self.goatpath,"nodes"))]:
+            with open(nodefile,"r") as f:
+                nodelist.append(json.loads(f.read()))
+        return(nodelist)
+    def all_rels(self):
+        try:
+            with open(os.path.join(self.goatpath,"goatrels.gq"),"r") as f:
+                relfile=f.read().lstrip().rstrip()   
+        except Exception as e:
+            return str(e)
+        try:
+            print(os.path.join(self.goatpath,relfile))
+            with open(os.path.join(self.goatpath,relfile)) as f:
+                rels=f.read().split("\n")
+            if "" in rels:
+                rels.remove("")
+            relationships=[]
+            for rel in rels:
+                try:
+                    reldict={"source":rel.split("|")[0],"story":rel.split("|")[1],"target":rel.split("|")[2],"date":rel.split("|")[3]}
+                    relationships.append(reldict)
+                except Exception as e:
+                    print(e)
+                    print(rel)
+            return relationships
+        except Exception as e:
+            return str(e)
+            
