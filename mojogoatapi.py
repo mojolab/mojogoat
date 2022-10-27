@@ -88,7 +88,7 @@ def process_message(message):
         message['response']+=["Now we are talking - that was a reply to {}".format(message['apply_to'])]
         apply_to=message['apply_to']
     message['gtype']="unknown"
-   
+
     if re.match(r"HERD\?>listgoats",message['text']):
         message['response']=[goat.goatname for goat in herd]+['Current goat is {}'.format(curgoat.goatname)]
         message['gtype']="commandherd"
