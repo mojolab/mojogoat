@@ -135,7 +135,7 @@ class Goat:
             else:
                 with open(os.path.join(self.goatpath,"nodes",nodedict['nodeid']),'w') as f:
                     f.write(json.dumps(nodedict))
-                return(json.dumps(nodedict))
+                return(json.dumps(nodedict))     
     def all_nodes(self):
         nodelist=[]
         for nodefile in [os.path.join(self.goatpath,"nodes",node) for node in os.listdir(os.path.join(self.goatpath,"nodes"))]:
