@@ -1,4 +1,4 @@
-import os,json
+import os,json,re
 from .goat import Goat
 
 def read_herd_config(herdpath):

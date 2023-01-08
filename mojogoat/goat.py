@@ -165,4 +165,27 @@ class Goat:
             return relationships
         except Exception as e:
             return str(e)
+    def add_rels(self,newrels):
+        try:
+            with open(os.path.join(self.goatpath,"goatrels.gq"),"r") as f:
+                relfile=f.read().lstrip().rstrip()
+        except Exception as e:
+            return str(e)
+        try:
+            print(os.path.join(self.goatpath,relfile))
+            with open(os.path.join(self.goatpath,relfile)) as f:
+                rels=f.read().split("\n")
+            if "" in rels:
+                rels.remove("")
+            totalrels=list(set(rels+newrels))
+            #save these in a file under the snapshots folder
+            with open(os.path.join(self.goatpath,"snapshots","mojogoat-"+datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),"w") as f:
+                f.write("\n".join(totalrels))
+            with open(os.path.join(self.goatpath,"goatrels.gq"),"w") as f:
+                f.write("/".join(["snapshots","mojogoat-"+datetime.now().strftime("%Y-%m-%d-%H-%M-%S")]))
+
+        except Exception as e:
+            return str(e)
+
+            
             
