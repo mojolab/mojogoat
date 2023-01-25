@@ -183,7 +183,6 @@ class Goat:
                 f.write("\n".join(totalrels))
             with open(os.path.join(self.goatpath,"goatrels.gq"),"w") as f:
                 f.write("/".join(["snapshots","mojogoat-"+datetime.now().strftime("%Y-%m-%d-%H-%M-%S")]))
-
         except Exception as e:
             return str(e)
 
