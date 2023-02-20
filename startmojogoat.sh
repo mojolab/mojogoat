@@ -1,0 +1,1 @@
+mongod --dbpath /xpal-data/db --logappend --fork --logpath /xpal-data/db/mongod.log
