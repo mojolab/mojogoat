@@ -22,7 +22,8 @@ from flask_mongoengine import MongoEngine
 from mojogoat.utils import *
 from mojogoat.goat import *
 from mojogoat import mongonodes
-
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 
 app = Flask(__name__)
 
@@ -42,11 +43,19 @@ app.config['MONGODB_SETTINGS'] = {
 }
 
 
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:postgres@localhost:5432/xetrapal"
+sqldb = SQLAlchemy(app)
+migrate = Migrate(app, sqldb)
 
 
 db = MongoEngine(app)
 
-
+class SandeshModel(sqldb.Model):
+    __tablename__ = 'sandesh'
+    id = sqldb.Column(db.Integer, primary_key=True)
+    name = sqldb.Column(sqldb.String())
+    model = sqldb.Column(sqldb.String())
+    doors = sqldb.Column(sqldb.Integer())
 
 @app.route('/listener', methods=["POST"])
 def listener():
