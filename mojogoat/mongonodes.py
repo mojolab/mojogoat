@@ -46,6 +46,7 @@ class Node(PPrintMixin, DynamicDocument):
     nodelabels = fields.ListField(fields.StringField())
     created_ts = fields.DateTimeField(default=datetime.datetime.now)
     updated_ts = fields.DateTimeField(default=datetime.datetime.now)
+    
     def save(self, *args, **kwargs):
         if not self.created_ts:
             self.created_ts = datetime.datetime.now()
@@ -56,8 +57,22 @@ class Node(PPrintMixin, DynamicDocument):
         return "Node (%r)" % (self.nodeid)
 
 
-class Person(Node):
-    meta = {'queryset_class': CustomQuerySet}
-    name = fields.StringField()
+class Contact(Node):
+    email = fields.ListField()
+    phone = fields.ListField()
+    first_name = fields.StringField()
+    additional_name = fields.StringField()
+    last_name = fields.StringField()
+    
     def __repr__(self):
         return "Person (%r)" % (self.nodeid)
+    
+class Person(Node):
+    gender = fields.StringField()
+    photos = fields.ListField()
+    birthdate = fields.DateTimeField()
+    locations = fields.ListField()
+
+    def __repr__(self):
+        return "Person (%r)" % (self.nodeid)
+
