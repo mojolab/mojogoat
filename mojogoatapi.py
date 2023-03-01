@@ -10,14 +10,25 @@ API to parse recieve messages and parse GOAT commands
 # TODO: #8 ARCHITECTURE - Use appropriate stores for appropriate data - line records for relationships and doc records on entities
 
 from datetime import datetime
-from flask import Flask, request, jsonify
+import json
+from flask import Flask, Response, request, jsonify
 import io, os, re, sys
-from jmespath import search
+#from jmespath import search
 import requests
-from sqlalchemy import outparam
+#from sqlalchemy import outparam
+from flask import Flask, request, jsonify
+from flask_mongoengine import MongoEngine
 
 from mojogoat.utils import *
 from mojogoat.goat import *
+from mojogoat import mongonodes
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+app = Flask(__name__)
+
+
+
 global herd_config
 herd_config=read_herd_config(sys.argv[1])
 goatpen=herd_config['goatpen']
@@ -27,7 +38,24 @@ herd=get_goats(herd_config)
 global curgoat
 curgoat=herd[0]
 
-app = Flask(__name__)
+app.config['MONGODB_SETTINGS'] = {
+    'host':'mongodb://localhost/'+curgoat.goatname
+}
+
+
+app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:postgres@localhost:5432/xetrapal"
+sqldb = SQLAlchemy(app)
+migrate = Migrate(app, sqldb)
+
+
+db = MongoEngine(app)
+
+class SandeshModel(sqldb.Model):
+    __tablename__ = 'sandesh'
+    id = sqldb.Column(db.Integer, primary_key=True)
+    name = sqldb.Column(sqldb.String())
+    model = sqldb.Column(sqldb.String())
+    doors = sqldb.Column(sqldb.Integer())
 
 @app.route('/listener', methods=["POST"])
 def listener():
@@ -41,6 +69,55 @@ def listener():
      with open(goatlog, 'a') as f:
          f.write(str(result) + '\n')
      return jsonify(result)
+
+# App routes for CRUD operations on mongonodes.Node objects
+
+# Retrieve all existing mongonodes.Node from mongodb and return as json after removing cls and id fields
+@app.route('/nodes', methods=['GET'])
+def get_nodes():
+    nodes = mongonodes.Node.objects().all()
+    response = json.loads(nodes.to_json())
+    for node in response:
+        node.pop('_id')
+        node.pop('_cls')
+    return jsonify(response), 200
+
+# Route to retrieve a single node speicified by nodeid
+
+@app.route('/nodes/<nodeid>', methods=['GET'])
+def get_node(nodeid):
+    node = mongonodes.Node.objects(nodeid=nodeid).first()
+    if node is None:
+        return jsonify({"error":"node not found"}), 404
+    response = json.loads(node.to_json())
+    response.pop('_id')
+    response.pop('_cls')
+    return jsonify(response), 200
+
+'''
+ Create a new mongonodes.Node from a POST request with a JSON payload. The JSON payload should contain a 'nodeid' field.
+ If a mongonodes.Node already exists with the same 'nodeid' field, update the existing mongonodes.Node with the new data, else 
+ create a new mongonodes.Node and return as JSON 
+'''
+@app.route('/nodes', methods=['POST'])
+@app.route('/nodes/<nodeid>', methods=['POST'])
+def add_node(nodeid=None):
+    body = request.get_json()
+    if "nodeid" not in body.keys():
+        return jsonify({"error":"nodeid field is required"}), 400
+    nodeid=body['nodeid']
+    node = mongonodes.Node.objects(nodeid=nodeid).first()
+    if node is None:
+        node = mongonodes.Node(nodeid=nodeid)
+        node.save()
+    node.update(**body)
+    node.save()
+    node.reload()
+    response=json.loads(node.to_json())
+    response.pop('_id')
+    response.pop('_cls')
+    return jsonify(response), 200
+
 
 
 def set_current_goat(goatname):
@@ -133,7 +210,7 @@ def process_message(message):
     return message
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0',port='5001')
+    app.run(debug=True, host='0.0.0.0',port='5000')
 
 
 
