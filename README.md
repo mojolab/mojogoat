@@ -40,7 +40,7 @@ Attach a shell to the running container to get a command line
 ![Image-4](images/4.jpeg)
 ![Image-5](images/5.jpeg)
 ![Image-6](images/6.jpeg)
-![Image-7](images/7.jpeg)
+![Image-7](images/7.jpeg?raw=true)
 
 ## GOAT API
 
