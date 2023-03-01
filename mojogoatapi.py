@@ -16,14 +16,15 @@ import io, os, re, sys
 #from jmespath import search
 import requests
 #from sqlalchemy import outparam
-from flask import Flask, request, jsonify
 from flask_mongoengine import MongoEngine
 
 from mojogoat.utils import *
 from mojogoat.goat import *
-from mojogoat import mongonodes
-from flask_sqlalchemy import SQLAlchemy
+# from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+
+from mojogoat.mongonodes import *
+
 
 app = Flask(__name__)
 
@@ -44,15 +45,17 @@ app.config['MONGODB_SETTINGS'] = {
 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = "postgresql://postgres:postgres@localhost:5432/xetrapal"
-sqldb = SQLAlchemy(app)
+# sqldb = SQLAlchemy(app)
+sqldb.init_app(app)
 migrate = Migrate(app, sqldb)
-
-
 db = MongoEngine(app)
+
+# with app.app_context():
+#     sqldb.create_all()
 
 class SandeshModel(sqldb.Model):
     __tablename__ = 'sandesh'
-    id = sqldb.Column(db.Integer, primary_key=True)
+    id = sqldb.Column(sqldb.Integer(), primary_key=True)
     name = sqldb.Column(sqldb.String())
     model = sqldb.Column(sqldb.String())
     doors = sqldb.Column(sqldb.Integer())
@@ -71,6 +74,88 @@ def listener():
      return jsonify(result)
 
 # App routes for CRUD operations on mongonodes.Node objects
+
+@app.route('/relationships', methods=['GET'])
+def get_relationships():
+    
+    source = request.args.get('source')
+    target = request.args.get('target')
+    query = request.args.get('query')
+
+    if source:
+        relationships = Relationship.query.filter_by(source_id=source).all()
+    elif target:
+        relationships = Relationship.query.filter_by(target_id=target).all()
+    elif query:
+        relationships = Relationship.query.filter(Relationship.story.contains(query)).all()
+    else:
+        relationships = Relationship.query.all()
+        # return jsonify({'message': 'Please specify a source or target.'}), 400
+    results = []
+    for r in relationships:
+        results.append({
+            'relationship_id': r.relationship_id,
+            'source_id': r.source_id,
+            'target_id': r.target_id,
+            'story': r.story,
+            'timestamp': r.timestamp.isoformat()
+        })
+    return jsonify(results)
+
+
+
+@app.route('/relationships', methods=['POST'])
+def create_relationship():
+    data = request.get_json()
+    if not data:
+        return jsonify({'message': 'No input data provided'}), 400
+
+    # user_source = User.objects(user_id=data['source_id']).first()
+    # user_target = User.objects(user_id=data['target_id']).first()
+
+    # if not user_source:
+        # return jsonify({'message': 'Source user not found'}), 400
+    # if not user_target:
+        # return jsonify({'message': 'Target user not found'}), 400
+
+    relationship = Relationship(
+        # source_id=user_source.user_id,
+        # target_id=user_target.user_id,
+        source_id=data['source'],
+        target_id=data['target'],
+        story=data['story'],
+        timestamp=datetime.datetime.now()
+    )
+
+    sqldb.session.add(relationship)
+    sqldb.session.commit()
+
+    return jsonify({'message': 'Relationship created successfully'})
+
+
+@app.route('/relationships/<relationship_id>', methods=['DELETE'])
+def delete_relationship(relationship_id):
+    relationship = Relationship.query.filter_by(relationship_id=relationship_id).first()
+
+    if not relationship:
+        return jsonify({'message': 'Relationship not found'}), 404
+
+    sqldb.session.delete(relationship)
+    sqldb.session.commit()
+
+    return jsonify({'message': 'Relationship deleted successfully'})
+
+
+@app.route('/relationships/<int:id>', methods=['GET'])
+def get_relationship_by_id(id):
+    # Get relationship by ID
+    relationship = Relationship.query.get(id)
+    if relationship:
+        return jsonify(relationship.to_dict())
+    else:
+        return jsonify({'message': 'Relationship not found.'}), 404
+
+
 
 # Retrieve all existing mongonodes.Node from mongodb and return as json after removing cls and id fields
 @app.route('/nodes', methods=['GET'])
@@ -209,8 +294,11 @@ def process_message(message):
         message['response']=curgoat.add_node(message['feed'])
     return message
 
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0',port='5000')
+    
+    app.run(debug=True, host='0.0.0.0',port='5001')
 
 
 

@@ -9,8 +9,9 @@ import datetime
 import bson
 import json
 from flask_mongoengine import BaseQuerySet
+from flask_sqlalchemy import SQLAlchemy
 
-
+sqldb = SQLAlchemy()
 
 class PPrintMixin(object):
     def __str__(self):
@@ -75,4 +76,31 @@ class Person(Node):
 
     def __repr__(self):
         return "Person (%r)" % (self.nodeid)
+
+
+
+# SQl Models
+class Relationship(sqldb.Model):
+    __tablename__="relationship"
+    relationship_id  = sqldb.Column(sqldb.Integer, primary_key=True, autoincrement=True)
+    source_id = sqldb.Column(sqldb.String, nullable=False)
+    # source_id = sqldb.Column(sqldb.String, sqldb.ForeignKey('user.id'), nullable=False)
+    target_id = sqldb.Column(sqldb.String, nullable=False)
+    # target_id = sqldb.Column(sqldb.String, sqldb.ForeignKey('user.id'), nullable=False)
+    story = sqldb.Column(sqldb.String, nullable=False)
+    timestamp = sqldb.Column(sqldb.DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f"Relationship('{self.relationship_id}', '{self.source_id}', '{self.target_id}', '{self.story}', '{self.timestamp}')"
+    def to_dict(self):
+        return {
+        "relationship_id": self.relationship_id,
+        "source_id": self.source_id,
+        "target_id": self.target_id,
+        "story": self.story,
+        "timestamp": self.timestamp
+    }
+
+
+
 

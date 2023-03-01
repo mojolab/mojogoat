@@ -1,8 +1,9 @@
 {
 	"info": {
-		"_postman_id": "39443e09-9e46-4fa3-bfd3-82cae8a224fc",
+		"_postman_id": "3bf047d5-40e5-49c2-b680-2a03a6679a0f",
 		"name": "MojoGOAT",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "23649925"
 	},
 	"item": [
 		{
@@ -40,7 +41,35 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"text\":\"HERD?>listgoats\"\r\n\r\n}",
+					"raw": "{\r\n\"source\":\"a100\",\r\n\"story\": \"story 1\",\r\n\"target\": \"a200\"\r\n\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5001/relationships",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"relationships"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "SearchGoat",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"text\":\"GOAT?>searchnode arjun\"\r\n\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -62,13 +91,13 @@
 			"response": []
 		},
 		{
-			"name": "SearchGoat",
+			"name": "CreateRelationships",
 			"request": {
 				"method": "POST",
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\r\n    \"text\":\"HERD?>listgoats\"\r\n\r\n}",
+					"raw": "{\r\n    \"target\": \"a100\",\r\n    \"source\": \"a200\",\r\n    \"story\": \"Text data here\"\r\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -76,14 +105,158 @@
 					}
 				},
 				"url": {
-					"raw": "http://localhost:5001/listener",
+					"raw": "http://localhost:5001/relationships",
 					"protocol": "http",
 					"host": [
 						"localhost"
 					],
 					"port": "5001",
 					"path": [
-						"listener"
+						"relationships"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "ListRelationships",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5001/relationships",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"relationships"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "ListRelationshipsBySource",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5001/relationships?source=a200",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5001",
+							"path": [
+								"relationships"
+							],
+							"query": [
+								{
+									"key": "source",
+									"value": "a200"
+								}
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"body": null
+				},
+				{
+					"name": "ListRelationshipsByTarget",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5001/relationships?target=a200",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5001",
+							"path": [
+								"relationships"
+							],
+							"query": [
+								{
+									"key": "target",
+									"value": "a200"
+								}
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"body": null
+				},
+				{
+					"name": "ListRelationshipsByQuery",
+					"originalRequest": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5001/relationships?query=Text",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "5001",
+							"path": [
+								"relationships"
+							],
+							"query": [
+								{
+									"key": "query",
+									"value": "Text"
+								}
+							]
+						}
+					},
+					"_postman_previewlanguage": null,
+					"header": null,
+					"cookie": [],
+					"body": null
+				}
+			]
+		},
+		{
+			"name": "DeleteRelationshipById",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5001/relationships/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"relationships",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "GetRelationshipById",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5001/relationships/2",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"relationships",
+						"2"
 					]
 				}
 			},
