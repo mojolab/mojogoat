@@ -6,13 +6,11 @@ This is where we define our models.
 
 from mongoengine import Document, fields, DynamicDocument
 import datetime
-import bson
 import json
 from flask_mongoengine import BaseQuerySet
-from flask_sqlalchemy import SQLAlchemy
+from mojogoat import sqldb
 
-sqldb = SQLAlchemy()
-
+# Mongo Models
 class PPrintMixin(object):
     def __str__(self):
         return '<{}: id={!r}>'.format(type(self).__name__, self.id)
@@ -78,6 +76,13 @@ class Person(Node):
         return "Person (%r)" % (self.nodeid)
 
 
+# Sandesh Model
+class SandeshModel(sqldb.Model):
+    __tablename__ = 'sandesh'
+    id = sqldb.Column(sqldb.Integer(), primary_key=True)
+    name = sqldb.Column(sqldb.String())
+    model = sqldb.Column(sqldb.String())
+    doors = sqldb.Column(sqldb.Integer())
 
 # SQl Models
 class Relationship(sqldb.Model):

@@ -228,7 +228,7 @@
 				"method": "DELETE",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:5001/relationships/1",
+					"raw": "http://localhost:5001/relationships/2",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -236,7 +236,7 @@
 					"port": "5001",
 					"path": [
 						"relationships",
-						"1"
+						"2"
 					]
 				}
 			},
@@ -248,7 +248,7 @@
 				"method": "GET",
 				"header": [],
 				"url": {
-					"raw": "http://localhost:5001/relationships/2",
+					"raw": "http://localhost:5001/relationships/5",
 					"protocol": "http",
 					"host": [
 						"localhost"
@@ -256,7 +256,60 @@
 					"port": "5001",
 					"path": [
 						"relationships",
-						"2"
+						"5"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "List Nodes",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5001/nodes",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"nodes"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateNode",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"nodeid\": \"a3\",\r\n    \"nodelabels\": [\"l2\", \"l1\"],\r\n    \"name\": \"Saqib\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5001/nodes",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5001",
+					"path": [
+						"nodes"
 					]
 				}
 			},
