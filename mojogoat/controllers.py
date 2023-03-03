@@ -175,18 +175,25 @@ def create_relationship(data):
         return {'message': 'No input data provided'}, 400
     # user_source = User.objects(user_id=data['source_id']).first()
     # user_target = User.objects(user_id=data['target_id']).first()
+    
+    source_id=data['source']
+    target_id=data['target']
 
-    # if not user_source:
-        # return jsonify({'message': 'Source user not found'}), 400
-    # if not user_target:
-        # return jsonify({'message': 'Target user not found'}), 400
+    # check if source and target exist in the mongo db class Node 
+    source_node = Node.objects(nodeid=source_id).first()
+    target_node = Node.objects(nodeid=target_id).first()
+    if not source_node:
+        return {'message': 'Source node not found'}, 400
+    if not target_node:
+        return {'message': 'Target node not found'}, 400
+
     relationship = Relationship(
     # source_id=user_source.user_id,
     # target_id=user_target.user_id,
     source_id=data['source'],
     target_id=data['target'],
     story=data['story'],
-    timestamp=datetime.datetime.now()
+    timestamp=datetime.now()
     )
     try:
         sqldb.session.add(relationship)

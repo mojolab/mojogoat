@@ -89,9 +89,7 @@ class Relationship(sqldb.Model):
     __tablename__="relationship"
     relationship_id  = sqldb.Column(sqldb.Integer, primary_key=True, autoincrement=True)
     source_id = sqldb.Column(sqldb.String, nullable=False)
-    # source_id = sqldb.Column(sqldb.String, sqldb.ForeignKey('user.id'), nullable=False)
     target_id = sqldb.Column(sqldb.String, nullable=False)
-    # target_id = sqldb.Column(sqldb.String, sqldb.ForeignKey('user.id'), nullable=False)
     story = sqldb.Column(sqldb.String, nullable=False)
     timestamp = sqldb.Column(sqldb.DateTime, nullable=False, default=datetime.datetime.utcnow)
 
