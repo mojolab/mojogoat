@@ -17,7 +17,8 @@ import io, os, re, sys
 app = Flask(__name__)
 
 global herd_config
-herd_config=read_herd_config(sys.argv[1])
+# herd_config=read_herd_config(sys.argv[-1])
+herd_config=read_herd_config("conf/sampleconfig.json")
 goatpen=herd_config['goatpen']
 goatlog=os.path.join(goatpen,"goatlog")
 global herd
@@ -33,7 +34,8 @@ app.config['MONGODB_SETTINGS'] = {
 
 sqldb = SQLAlchemy()
 sqldb.init_app(app)
-migrate = Migrate(app, sqldb)
+migrate = Migrate()
+migrate.init_app(app, sqldb)
 db = MongoEngine(app)
 
 
