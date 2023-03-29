@@ -50,12 +50,7 @@ migrate = Migrate(app, sqldb)
 
 db = MongoEngine(app)
 
-class SandeshModel(sqldb.Model):
-    __tablename__ = 'sandesh'
-    id = sqldb.Column(db.Integer, primary_key=True)
-    name = sqldb.Column(sqldb.String())
-    model = sqldb.Column(sqldb.String())
-    doors = sqldb.Column(sqldb.Integer())
+
 
 @app.route('/listener', methods=["POST"])
 def listener():
