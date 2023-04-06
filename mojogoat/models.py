@@ -75,7 +75,7 @@ class Person(Node):
     def __repr__(self):
         return "Person (%r)" % (self.nodeid)
 
-
+'''
 # Sandesh Model
 class SandeshModel(sqldb.Model):
     __tablename__ = 'sandesh'
@@ -83,6 +83,7 @@ class SandeshModel(sqldb.Model):
     name = sqldb.Column(sqldb.String())
     model = sqldb.Column(sqldb.String())
     doors = sqldb.Column(sqldb.Integer())
+'''
 
 # SQl Models
 class Relationship(sqldb.Model):
