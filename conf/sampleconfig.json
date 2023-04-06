@@ -3,19 +3,10 @@
   "goatlog": "goat.log",
   "goatlist": [
     {
-      "goatpath": "/xpal-data/GOATs",
-      "goatname": "testgoat1",
-      "goatdesc": "test goat1"
-    },
-    {
-      "goatpath": "/xpal-data/GOATs",
-      "goatname": "testgoat2",
-      "goatdesc": "test goat2"
-    },
-    {
-      "goatpath": "/xpal-data/GOATs",
-      "goatname": "anothergoat",
-      "goatdesc": "Another Goat"
+      "goatpath": "/xpal-data/goats/caregoat",
+      "goatname": "caregoat",
+      "goatdesc": "CareGram Goat"
+
     }
   ]
 }

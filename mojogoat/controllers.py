@@ -186,7 +186,10 @@ def create_relationship(data):
         return {'message': 'Source node not found'}, 400
     if not target_node:
         return {'message': 'Target node not found'}, 400
-
+    # Check if a relationship with the same source, story, and target exists
+    relationship = Relationship.query.filter_by(source_id=source_id, story=data['story'], target_id=target_id).first()
+    if relationship is not None:
+        return {'message': 'Relationship already exists'}, 400
     relationship = Relationship(
     # source_id=user_source.user_id,
     # target_id=user_target.user_id,
