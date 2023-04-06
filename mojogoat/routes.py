@@ -73,3 +73,8 @@ def get_relationship_by_id(id):
     result, status_code = controllers.get_relationship_by_id(id)
     return jsonify(result), status_code
 
+#App Route to delete node
+@app.route('/nodes/<nodeid>', methods=['DELETE'])
+def delete_node(nodeid):
+    result, status_code = controllers.delete_node_by_id(nodeid)
+    return jsonify(result), status_code

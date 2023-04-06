@@ -4,6 +4,7 @@ import json
 from .goat import *
 from .utils import *
 from mojogoat import herd, curgoat, herd_config
+from sqlalchemy import or_
 
 # Goat contollers
 
@@ -217,3 +218,19 @@ def delete_relationship_by_id(id):
     sqldb.session.commit()
     return {'message': 'Deleteled Successfully'}, 200
 
+# Function to delete node and all relationships associated with it
+def delete_node_by_id(id):
+    node = Node.objects(nodeid=id).first()
+
+    if not node:
+        return {'message': 'Node not found'}, 404
+
+    # Delete all relationships associated with the node
+    relationships = Relationship.query.filter(or_(Relationship.source_id==id, Relationship.target_id==id)).all()
+    for r in relationships:
+        sqldb.session.delete(r)
+        sqldb.session.commit()
+    
+    # Delete the node
+    node.delete()
+    return {'message': 'Deleted Successfully'}, 200
