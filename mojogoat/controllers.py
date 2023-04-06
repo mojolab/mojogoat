@@ -216,3 +216,4 @@ def delete_relationship_by_id(id):
     sqldb.session.delete(relationship)
     sqldb.session.commit()
     return {'message': 'Deleteled Successfully'}, 200
+
