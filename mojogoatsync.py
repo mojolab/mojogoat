@@ -3,22 +3,17 @@ import requests,sys
 
 
 if __name__ == '__main__':
-    # Connect to the GOATs
+    apiroot='http://localhost:5001'
     neo4jconfig=get_mgc("neo4j")
     print(neo4jconfig)
     neo4jdb=Neo4jGoat(neo4jconfig)
     print(neo4jdb.get_compostion())
     #TODO relace with API call to get all labels
-    labels=[
-    'Person',
-    'Brand',
-    'Company',
-    'NGO',
-    'Govt Body',
-    'Node',
-    ]
+    url=apiroot+'/labels'
+    labels=requests.get(url).json()
+    print(labels)
     update_keystones(neo4jdb,labels)
-    url=sys.argv[1]+"/nodes"
+    url=apiroot+'/nodes'
     r=requests.get(url)
     for node in r.json():
         print(node)

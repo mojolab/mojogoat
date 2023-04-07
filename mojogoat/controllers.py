@@ -234,3 +234,12 @@ def delete_node_by_id(id):
     # Delete the node
     node.delete()
     return {'message': 'Deleted Successfully'}, 200
+
+#Controller to return all unique labels across all Nodes
+def get_labels():
+    nodes = Node.objects().all()
+    labels = []
+    for n in nodes:
+        labels.extend(n.labels)
+    labels = list(set(labels))
+    return labels, 200
