@@ -8,7 +8,7 @@ if __name__ == '__main__':
     print(neo4jconfig)
     neo4jdb=Neo4jGoat(neo4jconfig)
     print(neo4jdb.get_compostion())
-    #TODO relace with API call to get all labels
+    # Get the latest list of labels on all Node objects
     url=apiroot+'/labels'
     labels=requests.get(url).json()
     print(labels)
@@ -16,11 +16,18 @@ if __name__ == '__main__':
     url=apiroot+'/nodes'
     r=requests.get(url)
     for node in r.json():
-        print(node)
-        if "Company" in node['labels']:
-            neo4jdb.add_node(name=node['companyname'],**node)
-        if "Brand" in node['labels']:
-            neo4jdb.add_node(name=node['brandname'],**node)
+        neo4jdb.add_node(**node)
         neo4jdb.update_labels(node['nodeid'],node['labels'])
-    url2='http://localhost:5001/relationships'
+    url2=apiroot + '/relationships'
+    r2=requests.get(url2)
+    for rel in r2.json():
+        try:
+            p=neo4jdb.repo.match(Node,rel['source_id']).first()
+            q=neo4jdb.repo.match(Node,rel['target_id']).first()
+            neo4jdb.link(p,q,storyline=rel['story'],adddate=rel['timestamp'])
+            neo4jdb.link(p,q,storyline=rel['story'],adddate=rel['timestamp'])
+            neo4jdb.repo.save(p)
+        except:
+            print(rel)
+        
     print(neo4jdb.get_compostion())

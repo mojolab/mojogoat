@@ -182,7 +182,7 @@ class Neo4jGoat:
     def link(self,x,y,storyline,adddate):
         curstory=self.get_story(x,y)
         newstory=[storyline]
-        print(newstory)
+        #print(newstory)
         if curstory is not None:
             newstory=list(set(newstory+curstory))
         output=x.linkedto.add(y, properties={"story":newstory,"adddate":adddate,"updatedate":datetime.datetime.now()})
@@ -227,8 +227,19 @@ class Neo4jGoat:
 def update_keystones(goat,labels):
     k1=goat.add_node(nodeid="__keystone1")
     k2=goat.add_node(nodeid="__keystone2")
-    goat.update_labels("__keystone1",labels)
-    goat.update_labels("__keystone2",labels)
+
+    k1labels=list(goat.nodes.match("Node",nodeid="__keystone1").first().labels)
+    k2labels=list(goat.nodes.match("Node",nodeid="__keystone2").first().labels)
+    
+    nlabels=list(set(k1labels+k2labels+labels))
+
+    print("Original Labels: "+str(list(set(k1labels+k2labels))))
+    print("New Labels: "+str(nlabels))
+
+    
+
+    goat.update_labels("__keystone1",nlabels)
+    goat.update_labels("__keystone2",nlabels)
 
     k1.isthesameas.add(k2)
     k1.linkedto.add(k2)

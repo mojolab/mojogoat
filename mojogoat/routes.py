@@ -84,3 +84,4 @@ def delete_node(nodeid):
 def get_labels():
     result, status_code = controllers.get_labels()
     return jsonify(result), status_code
+
