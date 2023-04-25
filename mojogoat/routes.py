@@ -29,6 +29,12 @@ def get_node(nodeid):
     result, status_code = controllers.get_node(nodeid)
     return jsonify(result), status_code
 
+#Route to get nodes by label using controllers.get_nodes_by_label()
+@app.route('/nodes/label/<label>', methods=['GET'])
+def get_nodes_by_label(label):
+    result, status_code = controllers.get_nodes_by_label(label)
+    return jsonify(result), status_code
+
 '''
  Create a new mongonodes.Node from a POST request with a JSON payload. The JSON payload should contain a 'nodeid' field.
  If a mongonodes.Node already exists with the same 'nodeid' field, update the existing mongonodes.Node with the new data, else 
@@ -54,6 +60,7 @@ def get_relationships():
 
 
 
+
 @app.route('/relationships', methods=['POST'])
 def create_relationship():
     data = request.get_json()
@@ -66,6 +73,12 @@ def delete_relationship(relationship_id):
     result,status_code  = controllers.delete_relationship_by_id(relationship_id)
     return jsonify(result), status_code
 
+# Route to search relationships by source, target or story fragment by sending a POST queryu to /relationships/search
+@app.route('/relationships/search', methods=['POST'])
+def search_relationships():
+    data = request.get_json()
+    result, status_code = controllers.get_relationships(**data)
+    return jsonify(result), status_code
 
 @app.route('/relationships/<int:id>', methods=['GET'])
 def get_relationship_by_id(id):
@@ -83,5 +96,17 @@ def delete_node(nodeid):
 @app.route('/labels', methods=['GET'])
 def get_labels():
     result, status_code = controllers.get_labels()
+    return jsonify(result), status_code
+
+#Route to get all node ids for a label using controller.get_nodeids_by_label()
+@app.route('/nodeids/<label>', methods=['GET'])
+def get_nodeids_by_label(label):
+    result, status_code = controllers.get_nodeids_by_label(label)
+    return jsonify(result), status_code
+
+#Route to get all node ids using controller.get_nodeids()
+@app.route('/nodeids', methods=['GET'])
+def get_nodeids():
+    result, status_code = controllers.get_nodeids()
     return jsonify(result), status_code
 
