@@ -138,13 +138,14 @@ def add_node(body):
 
 
 # Relationship controllers
-def get_relationships(source=None, target=None, query=None):
+#TODO rewrite to be able to searh rels better
+def get_relationships(source=None, target=None, story=None):
     if source!=None:
         relationships = Relationship.query.filter_by(source_id=source).all()
     elif target!=None:
         relationships = Relationship.query.filter_by(target_id=target).all()
-    elif query!=None:
-        relationships = Relationship.query.filter(Relationship.story.contains(query)).all()
+    elif story!=None:
+        relationships = Relationship.query.filter(Relationship.story.contains(story)).all()
     else:
         relationships = Relationship.query.all()
 
@@ -168,6 +169,7 @@ def get_relationship_by_id(id):
         return {'message': 'Relationship not found'}, 404
 
     return relationship.to_dict(), 200
+
 
 
 def create_relationship(data):
@@ -234,3 +236,35 @@ def delete_node_by_id(id):
     # Delete the node
     node.delete()
     return {'message': 'Deleted Successfully'}, 200
+
+#Controller to return all unique labels across all Nodes
+def get_labels():
+    nodes = Node.objects().all()
+    labels = []
+    for n in nodes:
+        labels.extend(n.labels)
+    labels = list(set(labels))
+    composition = {}
+    for l in labels:
+        composition[l]= Node.objects(labels__contains=l).count()
+    return composition, 200
+
+def get_nodeids_by_label(label):
+    nodes = Node.objects(labels__contains=label).all()
+    nodeids = []
+    for n in nodes:
+        nodeids.append(n.nodeid)
+    return nodeids, 200
+def get_nodes_by_label(label):
+    nodes = Node.objects(labels__contains=label).all()
+    response = json.loads(nodes.to_json())
+    for node in response:
+        node.pop('_id')
+        node.pop('_cls')
+    return response, 200
+def get_nodeids():
+    nodes = Node.objects().all()
+    nodeids = []
+    for n in nodes:
+        nodeids.append(n.nodeid)
+    return nodeids, 200
