@@ -238,7 +238,27 @@ class Neo4jGoat:
                 rellines=rellines+"\n"+"|".join([rel[0].nodeid,"is the same as",rel[2].nodeid])
         with open(os.path.join(path,self.dbname+"-"+datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),"w") as f:
             f.write(rellines)
-
+    
+    def get_rels_as_dicts(self,nodeid=None):
+        rels=[]
+        reldicts=[]
+        if nodeid is not None:
+            node=self.nodes.match("Node",nodeid=nodeid).first()
+            rels=self.graph.match({node},r_type="LINKEDTO")
+        else:
+            rels=self.graph.match(r_type="LINKEDTO")
+        for rel in rels:
+            stories=rel.get("story")
+            if stories is None:
+                stories=['']
+            for story in stories:
+                reldict={}
+                reldict['source']=rel.start_node.get("nodeid")
+                reldict['target']=rel.end_node.get("nodeid")
+                reldict['story']=story
+                #reldict['adddate']=rel.get("adddate")
+                reldicts.append(reldict)
+        return reldicts
 
 
 def update_keystones(goat,labels):

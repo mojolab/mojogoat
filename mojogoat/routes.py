@@ -53,9 +53,9 @@ def add_node(nodeid=None):
 def get_relationships():
     source = request.args.get('source')
     target = request.args.get('target')
-    query = request.args.get('query')
+    story = request.args.get('story')
 
-    result, status_code = controllers.get_relationships(source=source, target=target, query=query)    
+    result, status_code = controllers.get_relationships(source=source, target=target, story=story)    
     return jsonify(result), status_code
 
 
