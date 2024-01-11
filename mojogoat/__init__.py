@@ -12,10 +12,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_mongoengine import MongoEngine
 import io, os, re, sys
-
+from flask_cors import CORS, cross_origin
 
 app = Flask(__name__)
-
+CORS(app)
 global herd_config
 # herd_config=read_herd_config(sys.argv[-1])
 herd_config=read_herd_config("conf/sampleconfig.json")

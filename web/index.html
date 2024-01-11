@@ -1,0 +1,27 @@
+<!-- FILEPATH: /home/ananda/xpal-src/mojogoat/web/index.html -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Node List</title>
+</head>
+<body>
+    <h1>Node List</h1>
+    <ul id="node-list"></ul>
+
+    <script>
+        // Fetch nodes from API
+        fetch('http://172.27.232.2:5000/nodes')
+            .then(response => response.json())
+            .then(data => {
+                // Loop through nodes and add to list
+                data.forEach(node => {
+                    const li = document.createElement('li');
+                    li.textContent = node.name;
+                    document.getElementById('node-list').appendChild(li);
+                });
+            })
+            .catch(error => console.error(error));
+    </script>
+</body>
+</html>
