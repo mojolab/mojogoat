@@ -1,6 +1,6 @@
 # Importing dependencies
-#from platform import node
-import pygsheets
+from platform import node
+
 import pandas
 import os,datetime
 from py2neo import Graph
@@ -8,11 +8,16 @@ from py2neo.ogm import Repository, Model, Property, RelatedTo, Label
 from py2neo.matching import *
 import re,json
 
+labels=[
+    "Node",
+    "Person",
+    "Organization",
+    "Artefact",
+    "Project",
+    "Program"
+]
 #Import pyxlrd
-
 #Read configs from file in path "goatconfigs"
-
-
 # GOAT Definitions
 def get_rels_from_file(relfile):
     adddate=relfile.split("/")[-1].replace("relationships-","")
@@ -23,11 +28,31 @@ def get_rels_from_file(relfile):
         relationships=[{"source":rel.split("|")[0],"story":rel.split("|")[1],"target":rel.split("|")[2],"date":"29-May-2022"} for rel in rels]
     return relationships
 # function to get a mojogoat configuration for a specific dbname
-def get_mgc(dbname="neo4j", goatconfigpath="/xpal-data/goatconfigs/neo4jgoatconfig.json"):
-    with open(goatconfigpath) as f:
-        goatconfig=json.loads(f.read())
-    goatconfig['dbname']=dbname
-    return goatconfig
+def get_mgc(dbname="neo4j", goatconfigpath="/content/conf/neo4jgoatconfig.json"):
+    try:
+        with open(goatconfigpath) as f:
+            goatconfig=json.loads(f.read())
+        goatconfig['dbname']=dbname
+        return goatconfig
+    except Exception as e:
+        print(str(e))
+        return None
+
+def update_keystones(goat, labels=labels):
+    k1=goat.add_node(nodeid="__keystone0")
+    k2=goat.add_node(nodeid="__keystone1")
+    goat.update_labels("__keystone0",labels)
+    goat.update_labels("__keystone1",labels)
+
+    k1.isthesameas.add(k2)
+    k1.linkedto.add(k2)
+    k2.isthesameas.add(k1)
+    k2.linkedto.add(k1)
+    goat.repo.save(k2)
+    goat.repo.save(k1)
+
+    
+    
 
 # function to generate a nodeid
 def get_nodeid(node):
@@ -44,7 +69,7 @@ class Node(Model):
     linkedto=RelatedTo("Node")
     isthesameas=RelatedTo("Node")
     nodetype = Property()
-    url=Property() # Added to point to the mojogoat API node
+    url=Property()
 
     def get_properties(self):
         return {
@@ -65,11 +90,7 @@ class Node(Model):
             self.nodeid, self.name
         )
 
-'''
-Obsolete or redundant
-
-These are only useful to keep additional data in Neo4J which we dont need. 
-
+# These classes are only relevant for having more properties in the Neo4J daabase itself. Not strictly relevant methinks: Arjun 2023-04-06
 # define a class to store Person records with properties nodeid, name, linkedto, urls
 class Person(Node):
     __primarykey__="nodeid"
@@ -129,21 +150,21 @@ class Artefact(Node):
             "summary": self.summary,
             "url": self.url
         }
-'''
+
 
 # Define a class for a MojoGOAT
 class Neo4jGoat:
-    def __init__(self,goatconfig):
-        self.graph = Graph("bolt://"+goatconfig['dburl'], auth=(goatconfig['username'], goatconfig['password']), name=goatconfig['dbname'])
-        self.repo = Repository("bolt://" + goatconfig['username'] + "@" +goatconfig['dburl'], password=goatconfig['password'], name=goatconfig['dbname'])
+    def __init__(self):
+        self.graph = Graph("neo4j+s://44f5e188.databases.neo4j.io", auth=("neo4j", "OvtqJ0ZsZ7pkyIpExkX4q8Sg6FQ8-f4Kv1I_9tYt2-4"))
+        self.repo = Repository("neo4j+s://44f5e188.databases.neo4j.io", auth=("neo4j", "OvtqJ0ZsZ7pkyIpExkX4q8Sg6FQ8-f4Kv1I_9tYt2-4"))
         self.nodes=NodeMatcher(self.graph)
-        self.dbname=goatconfig['dbname']
+        #self.dbname=goatconfig['dbname']
 
     # Self Reporting
 
     #function to get the graph composition
     def get_compostion(self):
-        return {label:self.nodes.match(label).count() for label in list(self.graph.schema.node_labels)}
+        return[{label:self.nodes.match(label).count()}for label in list(self.graph.schema.node_labels)]
         
     # function to add a generic node to the graph
     def add_node(self,**kwargs):
@@ -159,24 +180,13 @@ class Neo4jGoat:
         p=Node(**kwargs)
         self.repo.save(p)
         return p
-    # function to return all nodes as a list of dictionaries
-    def get_node_dicts(self):
-        nodes=[]
-        for node in self.repo.match(Node):
-            nodedict=node.get_properties()
-            nodedict['labels']=list(self.nodes.match("Node",nodeid=node.nodeid).first().labels)
-            nodes.append(nodedict)
-        return nodes
-    # function to return a specific node as a dictionary
+    
     def get_node_dict(self,nodeid):
         node=self.repo.match(Node,nodeid).first().get_properties()
         nodelabels=self.nodes.match("Node",nodeid=nodeid).first().labels
         node['labels']=list(nodelabels)
         return node
-    # function to return a list of all nodeids
-    def get_nodeids(self):
-        return [node.nodeid for node in self.repo.match(Node)]
-    
+        
     # function to update the labels of a node
     def update_labels(self,nodeid,labels):
         thisnode=self.nodes.match("Node",nodeid=nodeid).first()
@@ -197,13 +207,26 @@ class Neo4jGoat:
 
     #function to create and add lines to a relationship -- TODO: add a way to include timestamps for relationship updates
     def link(self,x,y,storyline,adddate):
-        curstory=self.get_story(x,y)
-        newstory=[storyline]
-        #print(newstory)
-        if curstory is not None:
-            newstory=list(set(newstory+curstory))
-        output=x.linkedto.add(y, properties={"story":newstory,"adddate":adddate,"updatedate":datetime.datetime.now()})
-        return output
+        try:
+            curstory=self.get_story(x,y)
+            newstory=[storyline]
+            print(newstory)
+            if curstory is not None:
+                newstory=list(set(newstory+curstory))
+            output=x.linkedto.add(y, properties={"story":newstory,"adddate":adddate,"updatedate":datetime.datetime.now()})
+            self.repo.save(x)
+            return output
+        except Exception as e:
+            print(str(e))
+            return None
+    
+    def link_nodes(self, x_nodeid, y_nodeid, story, adddate):
+        x = self.repo.match(Node, x_nodeid).first()
+        y = self.repo.match(Node, y_nodeid).first()
+        print(x.nodeid, y.nodeid)
+        if x is None or y is None:
+            return None
+        return self.link(x, y, story, adddate)
 
     # function to link nodes with relationship storyline "is"
     def link_is(self,node1,node2):
@@ -211,6 +234,15 @@ class Neo4jGoat:
         node2.isthesameas.add(node1)
         self.repo.save(node1)
         self.repo.save(node2)
+
+    '''
+    Obsolete functions
+    # function to add an artefact 
+    def add_artefact(self,node, url=None, summary=None, atype=None):
+        nodeid=get_nodeid(node)
+        a=Artefact(nodeid=nodeid, name=node, url=url, summary=summary, atype=type)
+        self.repo.save(a)
+        return a
 
     def eat_goat_nodes(self,goat):
         for node in goat.all_nodes():
@@ -223,6 +255,9 @@ class Neo4jGoat:
             target=self.add_node(nodeid=rel['target'])
             self.link(source,target,rel['story'],rel['date'])
             self.repo.save(source)
+
+    # Functions to get poop and milk out of the GOAT
+    '''
 
     # function to dump all relationships to a file
     def dump_all_rels(self,path="/opt/xpal-data/mojogoat"):
@@ -238,49 +273,5 @@ class Neo4jGoat:
                 rellines=rellines+"\n"+"|".join([rel[0].nodeid,"is the same as",rel[2].nodeid])
         with open(os.path.join(path,self.dbname+"-"+datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),"w") as f:
             f.write(rellines)
-    
-    def get_rels_as_dicts(self,nodeid=None):
-        rels=[]
-        reldicts=[]
-        if nodeid is not None:
-            node=self.nodes.match("Node",nodeid=nodeid).first()
-            rels=self.graph.match({node},r_type="LINKEDTO")
-        else:
-            rels=self.graph.match(r_type="LINKEDTO")
-        for rel in rels:
-            stories=rel.get("story")
-            if stories is None:
-                stories=['']
-            for story in stories:
-                reldict={}
-                reldict['source']=rel.start_node.get("nodeid")
-                reldict['target']=rel.end_node.get("nodeid")
-                reldict['story']=story
-                #reldict['adddate']=rel.get("adddate")
-                reldicts.append(reldict)
-        return reldicts
 
 
-def update_keystones(goat,labels):
-    k1=goat.add_node(nodeid="__keystone1")
-    k2=goat.add_node(nodeid="__keystone2")
-
-    k1labels=list(goat.nodes.match("Node",nodeid="__keystone1").first().labels)
-    k2labels=list(goat.nodes.match("Node",nodeid="__keystone2").first().labels)
-    
-    nlabels=list(set(k1labels+k2labels+labels))
-
-    print("Original Labels: "+str(list(set(k1labels+k2labels))))
-    print("New Labels: "+str(nlabels))
-
-    
-
-    goat.update_labels("__keystone1",nlabels)
-    goat.update_labels("__keystone2",nlabels)
-
-    k1.isthesameas.add(k2)
-    k1.linkedto.add(k2)
-    k2.isthesameas.add(k1)
-    k2.linkedto.add(k1)
-    goat.repo.save(k2)
-    goat.repo.save(k1)
