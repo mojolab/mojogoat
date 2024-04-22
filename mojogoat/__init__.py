@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app)
 global herd_config
 # herd_config=read_herd_config(sys.argv[-1])
-herd_config=read_herd_config("conf/sampleconfig.json")
+herd_config=read_herd_config("/xpal-data/conf/sampleconfig.json")
 goatpen=herd_config['goatpen']
 goatlog=os.path.join(goatpen,"goatlog")
 global herd

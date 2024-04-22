@@ -154,9 +154,11 @@ class Artefact(Node):
 
 # Define a class for a MojoGOAT
 class Neo4jGoat:
-    def __init__(self):
-        self.graph = Graph("neo4j+s://44f5e188.databases.neo4j.io", auth=("neo4j", "OvtqJ0ZsZ7pkyIpExkX4q8Sg6FQ8-f4Kv1I_9tYt2-4"))
-        self.repo = Repository("neo4j+s://44f5e188.databases.neo4j.io", auth=("neo4j", "OvtqJ0ZsZ7pkyIpExkX4q8Sg6FQ8-f4Kv1I_9tYt2-4"))
+    def __init__(self,configjson):
+        with open(configjson) as f:
+            goatconfig=json.loads(f.read())
+        self.graph = Graph(goatconfig['url'], auth=(goatconfig['database'], goatconfig['password']))
+        self.repo = Repository(goatconfig['url'], auth=(goatconfig['database'], goatconfig['password']))
         self.nodes=NodeMatcher(self.graph)
         #self.dbname=goatconfig['dbname']
 
