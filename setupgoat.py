@@ -30,7 +30,7 @@ print("Nodes from AVMojoGoat: ",nodes)
 
 with open("/xpal-data/goats/avmojogoat/snapshots/mojogoat-2023-01-09-03-39-24","r") as f:
     rellines=f.readlines()
-    
+
 rellist=[]
 for rel in rellines:
     reldict={}
@@ -41,10 +41,13 @@ for rel in rellines:
     rellist.append(reldict)
 
 for rel in rellist:
-    source=neo4jdb.repo.match(Node,rel['source']).first()
-    target=neo4jdb.repo.match(Node,rel['target']).first()
-    story=rel['story']
-    adddate=rel['adddate']
-    neo4jdb.link(source,target,story,adddate)
-    neo4jdb.repo.save(source)
-
+    try:
+        source=neo4jdb.repo.match(Node,rel['source']).first()
+        target=neo4jdb.repo.match(Node,rel['target']).first()
+        story=rel['story']
+        adddate=rel['adddate']
+        neo4jdb.link(source,target,story,adddate)
+        neo4jdb.repo.save(source)
+    except Exception as e:
+        print(str(e),rel)
+        
