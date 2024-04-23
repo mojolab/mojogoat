@@ -10,8 +10,8 @@ from goatherd import *
 
 neo4jdb=Neo4jGoat("/xpal-data/conf/neo4jdbgoat.json")
 
-
-
+ 
+ 
 
 mojolabels=labels+[]
 print("Global Labels:"+str(labels)+"\nCurrent Composition: ",neo4jdb.get_compostion())
