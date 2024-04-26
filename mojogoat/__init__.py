@@ -5,7 +5,7 @@ Created on Sun Sep 30 03:10:53 2018
 
 @author: arjun
 """
-from .goat import *
+from .goatbases.textgoat import *
 from .utils import *
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -13,7 +13,7 @@ from flask_migrate import Migrate
 from flask_mongoengine import MongoEngine
 import io, os, re, sys
 from flask_cors import CORS, cross_origin
-
+'''
 app = Flask(__name__)
 CORS(app)
 global herd_config
@@ -41,3 +41,4 @@ db = MongoEngine(app)
 
 
 from mojogoat import routes
+'''

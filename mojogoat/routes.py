@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 import json
-from mojogoat.models import sqldb, Relationship, Node
+from mojogoat.mojogoat.goatbases.mongogoat.models import sqldb, Relationship, Node
 from mojogoat import *
 from mojogoat import controllers
 

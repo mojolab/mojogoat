@@ -10,7 +10,7 @@ API to parse recieve messages and parse GOAT commands
 # TODO: #8 ARCHITECTURE - Use appropriate stores for appropriate data - line records for relationships and doc records on entities
 
 from mojogoat import *
-from mojogoat.models import Node
+from mojogoat.mojogoat.goatbases.mongogoat.models import Node
 
 
 if __name__ == '__main__':

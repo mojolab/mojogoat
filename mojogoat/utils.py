@@ -1,5 +1,5 @@
 import os,json,re
-from .goat import Goat
+from .goatbases import TextGoat
 
 def read_herd_config(herdpath):
     with open(herdpath,'r') as f:

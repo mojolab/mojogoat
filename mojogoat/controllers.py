@@ -1,7 +1,7 @@
-from mojogoat.models import sqldb, Relationship, Node
+from mojogoat.mojogoat.goatbases.mongogoat.models import sqldb, Relationship, Node
 import datetime
 import json
-from .goat import *
+from .goatbases.textgoat import *
 from .utils import *
 from mojogoat import herd, curgoat, herd_config
 from sqlalchemy import or_
