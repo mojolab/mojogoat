@@ -160,6 +160,7 @@ class Neo4jGoat:
         self.graph = Graph(goatconfig['url'], auth=(goatconfig['database'], goatconfig['password']))
         self.repo = Repository(goatconfig['url'], auth=(goatconfig['database'], goatconfig['password']))
         self.nodes=NodeMatcher(self.graph)
+        self.rels=RelationshipMatcher(self.graph)
         #self.dbname=goatconfig['dbname']
 
     # Self Reporting
