@@ -13,8 +13,7 @@ labels=[
     "Person",
     "Organization",
     "Artefact",
-    "Project",
-    "Program"
+    "Role"
 ]
 #Import pyxlrd
 #Read configs from file in path "goatconfigs"
@@ -96,10 +95,8 @@ class Person(Node):
     __primarykey__="nodeid"
     nodeid = Property()
     name = Property()
-    role=Property()
     linkedto=RelatedTo(Node)
     urls=Property()
-    organization=Property()
     isthesameas=RelatedTo(Node)
     def get_properties(self):
         return {
@@ -118,8 +115,8 @@ class Organization(Node):
     name = Property()
     linkedto=RelatedTo(Node)    
     description=Property()
-    founded=Property()
-    hq=Property()
+    foundeddate=Property()
+    hqlocation=Property()
     isthesameas=RelatedTo("Node")
     
     def get_properties(self):
@@ -130,7 +127,22 @@ class Organization(Node):
             "founded": self.founded,
             "hq": self.hq
         }
-    
+
+class Role(Node):
+    __primarykey__="nodeid"
+    nodeid = Property()
+    name = Property()
+    description = Property()
+    linkedto=RelatedTo(Node)
+    urls=Property()
+    isthesameas=RelatedTo(Node)
+    def get_properties(self):
+        return {
+            "nodeid": self.nodeid,
+            "name": self.name,
+            "urls": self.urls
+        }
+
 # define a class to store Artefacs with properties name, type, summary, and url
 class Artefact(Node):
     __primarykey__="nodeid"
@@ -269,6 +281,7 @@ class Neo4jGoat:
             for rel in node.linkedto.triples():
                 try:
                     for line in rel[1][1]['story']:
+                        print("|".join([rel[0].nodeid,line,rel[2].nodeid]))
                         rellines=rellines+"\n"+"|".join([rel[0].nodeid,line,rel[2].nodeid])
                 except Exception as e:
                     print(str(e))
