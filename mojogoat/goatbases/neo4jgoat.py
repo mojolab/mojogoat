@@ -69,6 +69,8 @@ class Node(Model):
     isthesameas=RelatedTo("Node")
     nodetype = Property()
     url=Property()
+    addedts=Property()
+    updatedts=Property()
 
     def get_properties(self):
         return {
