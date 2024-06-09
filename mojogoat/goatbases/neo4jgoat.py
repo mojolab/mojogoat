@@ -104,9 +104,7 @@ class Person(Node):
         return {
             "nodeid": self.nodeid,
             "name": self.name,
-            "role": self.role,
-            "urls": self.urls,
-            "organization": self.organization
+            "urls": self.urls
         }
     
     
