@@ -13,7 +13,8 @@ labels=[
     "Person",
     "Organization",
     "Artefact",
-    "Role"
+    "Role",
+    "Place"
 ]
 #Import pyxlrd
 #Read configs from file in path "goatconfigs"
@@ -50,15 +51,11 @@ def update_keystones(goat, labels=labels):
     goat.repo.save(k2)
     goat.repo.save(k1)
 
-    
-    
-
 # function to generate a nodeid
 def get_nodeid(node):
     nodeid=node.replace(" ","")
     nodeid=re.sub('[^A-Za-z0-9]+', '', nodeid).lower()
     return nodeid
-
 
 # Defining the types of nodes we are tracking
 class Node(Model):
@@ -106,7 +103,6 @@ class Person(Node):
             "name": self.name,
             "urls": self.urls
         }
-    
     
 # define a class to store Organizations with properties nodeid, name, linkedto
 class Organization(Node):
@@ -163,6 +159,24 @@ class Artefact(Node):
             "url": self.url
         }
 
+class Place(Node):
+    __primarykey__="nodeid"
+    nodeid = Property()
+    name = Property()
+    ptype=Property()
+    summary=Property()
+    url=Property()
+    linkedto=RelatedTo(Node)
+    isthesameas=RelatedTo("Node")
+ 
+    def get_properties(self):
+        return {
+            "nodeid": self.nodeid,
+            "name": self.name,
+            "atype": self.atype,
+            "summary": self.summary,
+            "url": self.url
+        }
 
 # Define a class for a MojoGOAT
 class Neo4jGoat:
@@ -250,30 +264,6 @@ class Neo4jGoat:
         self.repo.save(node1)
         self.repo.save(node2)
 
-    '''
-    Obsolete functions
-    # function to add an artefact 
-    def add_artefact(self,node, url=None, summary=None, atype=None):
-        nodeid=get_nodeid(node)
-        a=Artefact(nodeid=nodeid, name=node, url=url, summary=summary, atype=type)
-        self.repo.save(a)
-        return a
-
-    def eat_goat_nodes(self,goat):
-        for node in goat.all_nodes():
-            self.add_node(**node)
-            self.update_labels(node['nodeid'],node['labels'])
-    
-    def eat_goat_rels(self,goat):
-        for rel in goat.all_rels():
-            source=self.add_node(nodeid=rel['source'])
-            target=self.add_node(nodeid=rel['target'])
-            self.link(source,target,rel['story'],rel['date'])
-            self.repo.save(source)
-
-    # Functions to get poop and milk out of the GOAT
-    '''
-
     # function to dump all relationships to a file
     def dump_all_rels(self,path="/opt/xpal-data/mojogoat"):
         rellines=""    
@@ -290,4 +280,16 @@ class Neo4jGoat:
         with open(os.path.join(path,self.dbname+"-"+datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),"w") as f:
             f.write(rellines)
 
-
+    def get_taxonomy(self):
+        graphlabels=self.graph.schema.node_labels
+        #get all linked_to relationships from the graph that contain the text "is a" in the story property
+        taxonomy=[rel for rel in self.rels.match((None,None,None)).where("_.story CONTAINS 'is a'").all()]
+        return taxonomy
+    
+    #define a function to return an array of dictionaries with each dictionary representing a node. Add a property to the dictionary called "labels" that contains the labels of the node   
+    def get_nodes(self):
+        nodes=[node.get_properties() for node in self.repo.match(Node).all()]
+        for node in nodes:
+            nodelabels=self.nodes.match("Node",nodeid=node['nodeid']).first().labels
+            node['labels']=list(nodelabels)
+        return nodes
