@@ -266,17 +266,18 @@ class Neo4jGoat:
 
     # function to dump all relationships to a file
     def dump_all_rels(self,path="/opt/xpal-data/mojogoat"):
-        rellines=""    
+        rellines=""
+        ts=datetime.datetime.now().strftime("%Y-%b-%d")
         for node in self.repo.match(Node).all():
             for rel in node.linkedto.triples():
                 try:
                     for line in rel[1][1]['story']:
                         print("|".join([rel[0].nodeid,line,rel[2].nodeid]))
-                        rellines=rellines+"\n"+"|".join([rel[0].nodeid,line,rel[2].nodeid])
+                        rellines=rellines+"\n"+"|".join([rel[0].nodeid,line,rel[2].nodeid],ts)
                 except Exception as e:
                     print(str(e))
             for rel in node.isthesameas.triples():
-                rellines=rellines+"\n"+"|".join([rel[0].nodeid,"is the same as",rel[2].nodeid])
+                rellines=rellines+"\n"+"|".join([rel[0].nodeid,"is the same as",rel[2].nodeid],ts)
         with open(os.path.join(path,self.dbname+"-"+datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")),"w") as f:
             f.write(rellines)
 
