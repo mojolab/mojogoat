@@ -39,10 +39,10 @@ def get_mgc(dbname="neo4j", goatconfigpath="/content/conf/neo4jgoatconfig.json")
         return None
 
 def update_keystones(goat, labels=labels):
-    k1=goat.add_node(nodeid="__keystone0")
-    k2=goat.add_node(nodeid="__keystone1")
-    goat.update_labels("__keystone0",labels)
+    k1=goat.add_node(nodeid="__keystone1")
+    k2=goat.add_node(nodeid="__keystone2")
     goat.update_labels("__keystone1",labels)
+    goat.update_labels("__keystone2",labels)
 
     k1.isthesameas.add(k2)
     k1.linkedto.add(k2)
