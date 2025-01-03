@@ -59,6 +59,7 @@ def update_labels_from_graphset(p):
         nodeid=node[0].get('nodeid')
         nodelabels=set(list(node[0].labels))
         filelabels=nodelabels
+        print(nodeid)
         try:
             with open("./textdata/nodes/"+nodeid,"r") as nodefile:
                 nodejson=json.loads(nodefile.read())
@@ -88,10 +89,12 @@ def update_node_properties(driver, nodeid, properties):
     return records
 
 def update_all_node_properties(driver,p):
+    #print(p)
     for node in p:
         nodeid=node[0].get('nodeid')
         nodelabels=set(list(node[0].labels))
         gnodejson=dict(node[0].items())
+        #print(nodeid)
         gnodejson['labels']=list(nodelabels)
         try:
             with open("./textdata/nodes/"+nodeid,"r") as nodefile:
@@ -104,8 +107,36 @@ def update_all_node_properties(driver,p):
                     print(nodejson)
                     try:
                         update_node_properties(driver,nodeid,nodejson)
+                        print("successfully updated")
                     except Exception as e:
                         print(e)
                 
         except Exception as e:
             print("No file")
+
+def get_node_and_relationship_counts(driver):
+    node_query = (
+        "MATCH (n) "
+        "RETURN labels(n) AS labels, count(n) AS count"
+    )
+    relationship_query = (
+        "MATCH ()-[r]->() "
+        "RETURN type(r) AS type, count(r) AS count"
+    )
+
+    node_counts, _, _ = driver.execute_query(
+        node_query,
+        database="neo4j",
+        routing_=RoutingControl.READ,
+    )
+
+    relationship_counts, _, _ = driver.execute_query(
+        relationship_query,
+        database="neo4j",
+        routing_=RoutingControl.READ,
+    )
+
+    node_count_dict = {tuple(record['labels']): record['count'] for record in node_counts}
+    relationship_count_dict = {record['type']: record['count'] for record in relationship_counts}
+
+    return node_count_dict, relationship_count_dict
