@@ -16,30 +16,29 @@ The GOAT takes a set of quads and sets up a way to feed it into a neo4j graph da
 
 ## Set up the GOATPen
 
-[GOATPen Docker Image](https://hub.docker.com/r/arjunvenkatraman/goatpen)
+[GOATPen Docker Image](https://hub.docker.com/r/arjunvenkatraman/xetrapal)
 
 Install Docker on your machine, then use a terminal to run the following command
 
 ```
-docker pull -a arjunvenkatraman/goatpen
+docker pull -a arjunvenkatraman/xetrapal
 ```
 
 Then start a container using the following command
 
 ```
-docker run  -it -p 8888:8888 -p 5001:5001  --mount type=bind,source=$pwd/xpal-data,target=/opt/xpal-data arjunvenkatraman/goatpen:latest
+docker run -it -p8888:8888 -p5000:5000 --mount type=bind,source=$pwd/xpal-data,target=/xpal-data --mount type=bind,source=$pwd/xpal-src,target=/xpal-src arjunvenkatraman/xetrapal:latest zsh
 ```
 
 Attach a shell to the running container to get a command line
 
-## GOAT API
+## Run a Jupyter Notebook from the docker container
 
-The GOAT API allows for interaction with the GOATs you have access to. To start the API attach a terminal to the running docker container and run the following command:
+## Set up a Neo4J Free Instance
 
-```
-cd /opt/xpal-data/mojogoat
-python3 mojogoatapi.py
-```
+## Connect to the Neo4J database from your Jupyter Notebook
+
+
 
 The API should now be accessible at http://localhost:5001
 
