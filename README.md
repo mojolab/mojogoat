@@ -14,7 +14,7 @@ The GOAT takes a set of quads and sets up a way to feed it into a neo4j graph da
 2. GOATs will eat almost everything, don't feed a GOAT rubbish unless you want a sick GOAT
 3. When a GOAT gets too fat, make biryani
 
-## Set up the GOATPen
+## Set up the Docker image
 
 [GOATPen Docker Image](https://hub.docker.com/r/arjunvenkatraman/xetrapal)
 
@@ -38,8 +38,13 @@ Attach a shell to the running container to get a command line
 
 ## Connect to the Neo4J database from your Jupyter Notebook
 
+Create a ```.json``` file under ```xpal-src/conf``` with the following format
 
+```
+{
+    "database":"neo4j",
+    "url":"<NEO4J DB URL>",
+    "password":"<NEO4J DB PASSWORD>"
+}
 
-The API should now be accessible at http://localhost:5001
-
-You can use the Postman collection included with the repository (in the `postman` folder) to test the API
+```
