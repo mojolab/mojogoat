@@ -4,7 +4,7 @@ from datetime import datetime
 #TODO: TextGoat Functions defined separately. Goat should use mongodb and not text files.
 
 
-class Goat:
+class TextGoat:
     def __init__(self,goatconfig):
         self.config=goatconfig
         self.goatpath = goatconfig['goatpath']
