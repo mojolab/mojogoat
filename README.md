@@ -16,7 +16,7 @@ The GOAT takes a set of quads and sets up a way to feed it into a neo4j graph da
 
 ## Set up the Docker image
 
-[GOATPen Docker Image](https://hub.docker.com/r/arjunvenkatraman/xetrapal)
+[Xetrapal Docker Image](https://hub.docker.com/r/arjunvenkatraman/xetrapal)
 
 Install Docker on your machine, then use a terminal to run the following command
 
@@ -34,11 +34,17 @@ Attach a shell to the running container to get a command line
 
 ## Run a Jupyter Notebook from the docker container
 
-## Set up a Neo4J Free Instance
+```
+jupyter notebook --allow-root --ip 0.0.0.0
+```
+Connect to the Jupyter console in a browser using the link in the command output of the form: ```http://127.0.0.1:8888/?token=<TOKEN>```
 
-## Connect to the Neo4J database from your Jupyter Notebook
+Create a new working folder under ```xpal-data``` and a new Jupyter notebook under this new folder. 
 
-Create a ```.json``` file under ```xpal-src/conf``` with the following format
+
+### Connect to the Neo4J database from your Jupyter Notebook
+
+Create a ```.json``` file under ```xpal-data/conf``` with the following format
 
 ```
 {
@@ -48,3 +54,14 @@ Create a ```.json``` file under ```xpal-src/conf``` with the following format
 }
 
 ```
+
+
+
+Try the following code blocks
+
+
+
+
+
+## Set up a Neo4J Free Instance
+
