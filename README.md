@@ -15,6 +15,8 @@ A set of quads can be represented in various formats, such as:
 
 The GOAT framework is designed to take these quads and facilitate their ingestion into a Neo4j graph database using Python bindings.&#x20;
 
+The nodes are stored as json objects, with the reference ```nodeid``` used to reference them in other data representations. 
+
 ## GOAT Sutras
 
 1. **Ownership Principle**: You can own a GOAT, some GOATs, many GOATs, big GOATs, small GOATs, public GOATs, private GOATs, and so forth, but no one owns THE GOAT. The GOAT is a shared resource, open for exploration and extension.
