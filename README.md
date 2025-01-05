@@ -78,6 +78,7 @@ To interact with the GOAT system, use Jupyter Notebook for running and testing y
 
    - Inside the Docker container, run:
      ```
+     cd /
      jupyter notebook --allow-root --ip 0.0.0.0
      ```
 
