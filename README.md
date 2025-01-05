@@ -23,11 +23,15 @@ The nodes are stored as json objects, with the reference ```nodeid``` used to re
 2. **Data Integrity Principle**: GOATs will eat almost everything, but feeding them rubbish will result in a sick GOAT. This emphasizes the importance of clean, structured, and meaningful data.
 3. **Scalability Principle**: When a GOAT gets too fat, make biryani. This is a metaphor for managing and scaling data effectively when the graph becomes too large or unwieldy.
 
-## Set up the Docker image
+## Installation
+For a step-by-step guide on setting up and using the GOAT system, watch the (poorly edited) setup video [here](https://drive.google.com/file/d/1cwjkeIpFtxBVfS4QoLc7V-6bMGUCD3Fy/view?usp=drive_link)
+
+
+### Set up the Docker image
 
 The GOAT system uses a Docker image to simplify setup and ensure a consistent environment across different machines.
 
-### Steps to Set Up
+####  Steps to Set Up
 
 1. **Install Docker**
 
@@ -66,7 +70,7 @@ The GOAT system uses a Docker image to simplify setup and ensure a consistent en
 
    - Attach a shell to the running container to access its command line.
 
-## Run a Jupyter Notebook from the Docker Container
+### Run a Jupyter Notebook from the Docker Container
 
 To interact with the GOAT system, use Jupyter Notebook for running and testing your code.
 
@@ -91,7 +95,7 @@ To interact with the GOAT system, use Jupyter Notebook for running and testing y
    - Create a new folder for your project.
    - Create a new Jupyter Notebook file within this folder to begin your work.
 
-## Connect to the Neo4J Database from Your Jupyter Notebook
+### Connect to the Neo4J Database from Your Jupyter Notebook
 
 Neo4j serves as the backbone of the GOAT system, providing a graph database for storing and querying quads. Follow these steps to set up a connection:
 
@@ -112,7 +116,7 @@ Neo4j serves as the backbone of the GOAT system, providing a graph database for 
 
    - Use your Jupyter Notebook to load this configuration file and test the connection to the Neo4j database. Ensure the credentials and URL are correct to avoid connection issues.
 
-## Set up a Neo4J Free Instance
+### Set up a Neo4J Free Instance
 
 Neo4j offers a free instance for small-scale projects and experimentation. You can set it up locally or use a cloud-hosted option:
 
