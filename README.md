@@ -33,14 +33,25 @@ The GOAT system uses a Docker image to simplify setup and ensure a consistent en
 
    - If you don’t have Docker installed, download and install it from [Docker’s official website](https://www.docker.com/products/docker-desktop/).
 
-2. **Pull the Xetrapal Docker Image**
+2. **Set up a local directory structure to work with**
+
+    - Open a terminal and run the following commands to create the necessary directories (UNIX style systems commands below, use the appropriate syntax/procedure for your OS):
+
+      ```sh
+      mkdir -p ./dev/xpal-data
+      mkdir -p ./dev/xpal-src
+      ```
+    - These commands will create the `xpal-data` and `xpal-src` directories under the `./dev` directory.
+
+3. **Pull the Xetrapal Docker Image**
 
    - Open a terminal and run the following command to pull the necessary Docker image:
      ```
+     cd dev
      docker pull -a arjunvenkatraman/xetrapal
      ```
 
-3. **Start a Docker Container**
+4. **Start a Docker Container**
 
    - Run the following command to start a container:
      ```
@@ -51,7 +62,7 @@ The GOAT system uses a Docker image to simplify setup and ensure a consistent en
      - `-p5000:5000`: Maps port 5000 for REST API access.
      - `--mount`: Binds local directories (`xpal-data` and `xpal-src`) to directories inside the container, enabling data persistence and code sharing.
 
-4. **Attach a Shell**
+5. **Attach a Shell**
 
    - Attach a shell to the running container to access its command line.
 
