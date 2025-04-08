@@ -28,7 +28,7 @@ function renderGraph(data) {
         .call(d3.drag()
             .on("start", dragStarted)
             .on("drag", dragged)
-            .on("end", dragEnded));
+            .on("end", dragEnded));  
 
     node.append("title")
         .text(d => d.id);

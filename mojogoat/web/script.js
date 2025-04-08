@@ -60,7 +60,7 @@ addBtn.addEventListener('click', () => {
         day: '2-digit',
         month: 'short',
         year: 'numeric'
-    }).replace(/ /g, '-');
+    }).replace(/ /g, '-'); 
 
     relationships.push({ source, story, target, timestamp });
     renderRelationships();
