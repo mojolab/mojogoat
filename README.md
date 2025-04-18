@@ -1,21 +1,33 @@
 # MojoGOAT - A Graph Of All Things
 
+<p align="center">
+  <img src="web/images/mojogoatlogo1.png" alt="MojoGOAT Logo" width="300"/>
+</p>
+
 ## Overview
 
-GOATs help structure information semantically by taking an ontological rather than a taxonomical approach. While a taxonomical approach organizes information into hierarchical categories, an ontological approach focuses on the relationships and connections between concepts, offering greater flexibility and depth. This allows for a more flexible and relational method of organizing and querying data.
+MojoGOAT helps structure information semantically by taking an **ontological** rather than a **taxonomical** approach. While a taxonomical approach organizes information into hierarchical categories, an ontological approach focuses on the relationships and connections between concepts, offering greater flexibility and depth. This allows for a more relational method of organizing and querying data.
 
-In this implementation of the GOAT, we use a "quad" as the semantic structure: `<source><story><target><date>`. Each quad represents a relationship between entities or concepts within a specific context and timestamp, enabling rich, interconnected data representations. For example, a quad might look like this: `PersonA|knows|PersonB|2025-01-05`, indicating that PersonA knows PersonB as of the specified date.
+### Semantic Structure: The Quad
 
-A set of quads can be represented in various formats, such as:
+In this implementation, we use a "quad" as the semantic structure: `<source><story><target><date>`. Each quad represents a relationship between entities or concepts within a specific context and timestamp, enabling rich, interconnected data representations. For example:
 
-- A table
-- A CSV file
+```
+PersonA|knows|PersonB|2025-01-05
+```
+
+This indicates that PersonA knows PersonB as of the specified date.
+
+Quads can be represented in various formats, such as:
+
+- Tables
+- CSV files
 - Plain delimited text
-- A more complex data structure like JSON
+- JSON structures
 
-The GOAT framework is designed to take these quads and facilitate their ingestion into a Neo4j graph database using Python bindings.&#x20;
+The MojoGOAT framework facilitates the ingestion of these quads into a Neo4j graph database using Python bindings. Nodes are stored as JSON objects, with the `nodeid` used as a reference in other data representations.
 
-The nodes are stored as json objects, with the reference ```nodeid``` used to reference them in other data representations. 
+---
 
 ## GOAT Sutras
 
@@ -23,119 +35,114 @@ The nodes are stored as json objects, with the reference ```nodeid``` used to re
 2. **Data Integrity Principle**: GOATs will eat almost everything, but feeding them rubbish will result in a sick GOAT. This emphasizes the importance of clean, structured, and meaningful data.
 3. **Scalability Principle**: When a GOAT gets too fat, make biryani. This is a metaphor for managing and scaling data effectively when the graph becomes too large or unwieldy.
 
+---
+
 ## Installation
-For a step-by-step guide on setting up and using the GOAT system, watch the (poorly edited) setup video [here](https://drive.google.com/file/d/1cwjkeIpFtxBVfS4QoLc7V-6bMGUCD3Fy/view?usp=drive_link)
 
+Follow these steps to set up and use the MojoGOAT system.
 
-### Set up the Docker image
+### 1. Set Up the Docker Image
 
 The GOAT system uses a Docker image to simplify setup and ensure a consistent environment across different machines.
 
-####  Steps to Set Up
+#### Steps:
 
-1. **Install Docker**
+1. **Install Docker**  
+   Download and install Docker from [Docker’s official website](https://www.docker.com/products/docker-desktop).
 
-   - If you don’t have Docker installed, download and install it from [Docker’s official website](https://www.docker.com/products/docker-desktop/).
+2. **Create Local Directory Structure**  
+   Run the following commands to create the necessary directories:
+   ```sh
+   mkdir -p ./dev/xpal-data
+   mkdir -p ./dev/xpal-src
+   ```
+   These commands create the `xpal-data` and `xpal-src` directories under the `./dev` directory.
 
-2. **Set up a local directory structure to work with**
+3. **Pull the Xetrapal Docker Image**  
+   Run:
+   ```sh
+   cd dev
+   docker pull -a arjunvenkatraman/xetrapal
+   ```
 
-    - Open a terminal and run the following commands to create the necessary directories (UNIX style systems commands below, use the appropriate syntax/procedure for your OS):
+4. **Start a Docker Container**  
+   Run:
+   ```sh
+   docker run -it -p8888:8888 -p5000:5000 \
+       --mount type=bind,source=$PWD/xpal-data,target=/xpal-data \
+       --mount type=bind,source=$PWD/xpal-src,target=/xpal-src \
+       arjunvenkatraman/xetrapal:latest zsh
+   ```
+   - `-it`: Starts the container in interactive mode with a terminal.
+   - `-p8888:8888`: Maps port 8888 for Jupyter Notebook access.
+   - `-p5000:5000`: Maps port 5000 for REST API access.
+   - `--mount`: Binds local directories to the container for data persistence.
 
-      ```sh
-      mkdir -p ./dev/xpal-data
-      mkdir -p ./dev/xpal-src
-      ```
-    - These commands will create the `xpal-data` and `xpal-src` directories under the `./dev` directory.
+5. **Attach a Shell**  
+   Attach a shell to the running container to access its command line.
 
-3. **Pull the Xetrapal Docker Image**
+---
 
-   - Open a terminal and run the following command to pull the necessary Docker image:
-     ```
-     cd dev
-     docker pull -a arjunvenkatraman/xetrapal
-     ```
+### 2. Run a Jupyter Notebook
 
-4. **Start a Docker Container**
+1. **Start Jupyter Notebook**  
+   Inside the Docker container, run:
+   ```sh
+   cd /
+   jupyter notebook --allow-root --ip 0.0.0.0
+   ```
 
-   - Run the following command to start a container:
-     ```
-     docker run -it -p8888:8888 -p5000:5000 --mount type=bind,source=$pwd/xpal-data,target=/xpal-data --mount type=bind,source=$pwd/xpal-src,target=/xpal-src arjunvenkatraman/xetrapal:latest zsh
-     ```
-     - `-it`: Starts the container in interactive mode with a terminal.
-     - `-p8888:8888`: Maps port 8888 of the container to port 8888 on the host machine (for Jupyter Notebook access).
-     - `-p5000:5000`: Maps port 5000 for REST API access.
-     - `--mount`: Binds local directories (`xpal-data` and `xpal-src`) to directories inside the container, enabling data persistence and code sharing.
+2. **Access Jupyter Notebook**  
+   Copy the link provided in the terminal (e.g., `://127.0.0.1:8888/?token=<TOKEN>`) and open it in your browser.
 
-5. **Attach a Shell**
-
-   - Attach a shell to the running container to access its command line.
-
-### Run a Jupyter Notebook from the Docker Container
-
-To interact with the GOAT system, use Jupyter Notebook for running and testing your code.
-
-1. **Start Jupyter Notebook**
-
-   - Inside the Docker container, run:
-     ```
-     cd /
-     jupyter notebook --allow-root --ip 0.0.0.0
-     ```
-
-2. **Access Jupyter Notebook**
-
-   - The command output will provide a link similar to:
-     ```
-     http://127.0.0.1:8888/?token=<TOKEN>
-     ```
-   - Copy and paste this link into your web browser to open the Jupyter Notebook interface.
-
-3. **Create a New Working Environment**
-
+3. **Set Up Your Workspace**  
    - Navigate to the `xpal-data` directory.
    - Create a new folder for your project.
-   - Create a new Jupyter Notebook file within this folder to begin your work.
+   - Create a new Jupyter Notebook file to begin your work.
 
-### Connect to the Neo4J Database from Your Jupyter Notebook
+---
 
-Neo4j serves as the backbone of the GOAT system, providing a graph database for storing and querying quads. Follow these steps to set up a connection:
+### 3. Connect to the Neo4j Database
 
-1. **Create a Configuration File**
+Neo4j serves as the backbone of the GOAT system, providing a graph database for storing and querying quads.
 
-   - In the `xpal-data/conf` directory, create a `.json` file with the following format:
-     ```json
-     {
-         "database": "neo4j",
-         "url": "<NEO4J DB URL>",
-         "password": "<NEO4J DB PASSWORD>"
-     }
-     ```
-   - Replace `<NEO4J DB URL>` with the URL of your Neo4j database (e.g., `bolt://localhost:7687`).
-   - Replace `<NEO4J DB PASSWORD>` with the password for your Neo4j instance.
+#### Steps:
 
-2. **Test the Connection**
+1. **Create a Configuration File**  
+   In the `xpal-data/conf` directory, create a `.json` file with the following format:
+   ```json
+   {
+       "database": "neo4j",
+       "url": "<NEO4J DB URL>",
+       "password": "<NEO4J DB PASSWORD>"
+   }
+   ```
+   Replace `<NEO4J DB URL>` (e.g., `bolt://localhost:7687`) and `<NEO4J DB PASSWORD>` with your Neo4j credentials.
 
-   - Use your Jupyter Notebook to load this configuration file and test the connection to the Neo4j database. Ensure the credentials and URL are correct to avoid connection issues.
+2. **Test the Connection**  
+   Use your Jupyter Notebook to load this configuration file and test the connection to the Neo4j database.
 
-### Set up a Neo4J Free Instance
+---
 
-Neo4j offers a free instance for small-scale projects and experimentation. You can set it up locally or use a cloud-hosted option:
+### 4. Set Up a Neo4j Free Instance
 
-1. **Local Installation**
+Neo4j offers a free instance for small-scale projects and experimentation.
 
+#### Options:
 
-__Note: Local installations are very hard to maintain and resource intensive to boot__
+1. **Local Installation**  
    - Download Neo4j from [Neo4j’s official website](https://neo4j.com/download/).
-   - Follow the installation instructions for your operating system.
+   - Follow the installation instructions for your OS.  
+   *(Note: Local installations can be resource-intensive.)*
 
-2. **Cloud Option**
+2. **Cloud Option**  
+   - Use [Neo4j Aura](https://neo4j.com/cloud/aura/), a cloud-hosted version of Neo4j with a free tier.
 
-   - Use Neo4j Aura, a cloud-hosted version of Neo4j, which provides a free tier for basic usage. Sign up at [Neo4j Aura](https://neo4j.com/cloud/aura/).
-
-3. **Configure and Start**
-
+3. **Configure and Start**  
    - For local setups, start the Neo4j server and ensure it’s running on the default Bolt protocol (`bolt://localhost:7687`).
    - For cloud setups, use the provided connection details.
 
-By completing these steps, you’ll have a fully functional GOAT system ready to organize, query, and explore interconnected data using Neo4j and Jupyter Notebook.
+---
+
+By completing these steps, you’ll have a fully functional MojoGOAT system ready to organize, query, and explore interconnected data using Neo4j and Jupyter Notebook.
 
