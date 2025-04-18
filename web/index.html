@@ -1,27 +1,163 @@
-<!-- FILEPATH: /home/ananda/xpal-src/mojogoat/web/index.html -->
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Node List</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MojoGOAT - Graph Relationship Editor</title>
+    <link rel="icon" href="images/mojogoatlogo1.png" type="image/png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .relationship-card {
+            margin: 10px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .relationship-card:hover {
+            background-color: #f8f9fa;
+        }
+        .split-pane {
+            display: flex;
+            height: 80vh;
+        }
+        .pane {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            position: relative;
+        }
+        #listContainer {
+            border-right: 1px solid #ddd;
+            flex: 0 0 40%;
+            max-width: 40%;
+        }
+        #graphContainer {
+            flex: 0 0 60%;
+            max-width: 60%;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        #graphContainer.fullscreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            z-index: 1000;
+            background: white;
+            padding: 20px;
+        }
+        
+        .fullscreen-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1001;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .tooltip {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            padding: 5px;
+            border-radius: 3px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .controls {
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 <body>
-    <h1>Node List</h1>
-    <ul id="node-list"></ul>
+    <div class="container-fluid mt-4">
+        <div class="d-flex align-items-center mb-4">
+            <img src="images/mojogoatlogo1.png" alt="MojoGOAT Logo" height="60" class="me-3">
+            <h1 class="mb-0">MojoGOAT Graph Relationship Editor</h1>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col">
+                <input type="file" id="fileInput" class="form-control" accept=".txt">
+            </div>
+            <div class="col">
+                <button id="visualizeBtn" class="btn btn-primary">Visualize Graph</button>
+            </div>
+            <div class="col">
+                <button id="saveBtn" class="btn btn-success" disabled>Save Changes</button>
+            </div>
+        </div>  
 
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Add New Relationship</h5>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <input type="text" id="sourceInput" class="form-control" placeholder="Source">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" id="storyInput" class="form-control" placeholder="Story">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="text" id="targetInput" class="form-control" placeholder="Target">
+                    </div>
+                    <div class="col-md-2">
+                        <input type="date" id="dateInput" class="form-control">
+                    </div>
+                    <div class="col-md-1">
+                        <button id="addBtn" class="btn btn-success">Add</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="split-pane">
+            <div id="listContainer" class="pane">
+                <h2>Relationships</h2>
+                <div class="controls">
+                    <button id="selectAllBtn" class="btn btn-secondary btn-sm">Select All</button>
+                    <button id="deselectAllBtn" class="btn btn-outline-secondary btn-sm">Deselect All</button>
+                </div>
+                <ul id="relationshipList" class="list-group">
+                    <!-- Relationships will be dynamically loaded here -->
+                </ul>
+            </div>
+            <div id="graphContainer" class="pane">
+                <h2>Graph Visualization</h2>
+                <!-- Graph visualization will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.2/d3.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="script.js"></script>
+    
+    <!-- Handle escape key to exit fullscreen -->
     <script>
-        // Fetch nodes from API
-        fetch('http://172.27.232.2:5000/nodes')
-            .then(response => response.json())
-            .then(data => {
-                // Loop through nodes and add to list
-                data.forEach(node => {
-                    const li = document.createElement('li');
-                    li.textContent = node.name;
-                    document.getElementById('node-list').appendChild(li);
-                });
-            })
-            .catch(error => console.error(error));
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const graphContainer = document.getElementById('graphContainer');
+                if (graphContainer.classList.contains('fullscreen')) {
+                    const toggleButton = document.querySelector('.fullscreen-toggle');
+                    graphContainer.classList.remove('fullscreen');
+                    toggleButton.innerHTML = '<i class="fa fa-expand"></i> Fullscreen';
+                    
+                    // Trigger a re-render to adjust the graph size
+                    const event = new Event('click');
+                    document.getElementById('visualizeBtn').dispatchEvent(event);
+                }
+            }
+        });
     </script>
 </body>
 </html>
