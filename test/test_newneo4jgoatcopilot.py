@@ -1,6 +1,8 @@
 import argparse
 import json
-from newneo4jgoatcopilot import Neo4jGoat
+import sys
+sys.path.append("/xpal-src/mojogoat")
+from mojogoat.goatbases.newneo4jgoatcopilot import Neo4jGoat
 
 def main():
     parser = argparse.ArgumentParser(description="Test script for newneo4jgoatcopilot.py")
