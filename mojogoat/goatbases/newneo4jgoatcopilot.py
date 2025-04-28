@@ -11,7 +11,11 @@ class Neo4jGoat:
     def get_composition(self):
         with self.driver.session() as session:
             result = session.run("CALL db.labels()")
-            return [{label: session.run(f"MATCH (n:{label}) RETURN count(n)").single()[0]} for label in result]
+            for record in result:
+                label = record[0]
+                count = session.run(f"MATCH (n:{label}) RETURN count(n)").single()[0]
+                print(f"Label: {label}, Count: {count}")
+            #return [{label: session.run(f"MATCH (n:{label}) RETURN count(n)").single()[0]} for label in result]
 
     def add_node(self, **kwargs):
         nodeid = kwargs['nodeid']
@@ -27,7 +31,7 @@ class Neo4jGoat:
                 return existing_node
             else:
                 session.run(
-                    "CREATE (n {nodeid: $nodeid}) SET n += $properties",
+                    "CREATE (n:Node {nodeid: $nodeid}) SET n += $properties",
                     nodeid=nodeid, properties=kwargs
                 )
                 return kwargs
@@ -100,7 +104,7 @@ class Neo4jGoat:
             result = session.run("MATCH (n) RETURN n")
             nodes = []
             for record in result:
-                node = record["n"]
+                node = dict(record["n"])
                 labels = session.run(
                     "MATCH (n {nodeid: $nodeid}) RETURN labels(n)",
                     nodeid=node["nodeid"]
