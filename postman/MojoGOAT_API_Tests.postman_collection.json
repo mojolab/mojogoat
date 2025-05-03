@@ -1,0 +1,1191 @@
+{
+  "info": {
+    "name": "MojoGOAT API Tests",
+    "description": "A collection of tests for the MojoGOAT API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "12345678"
+  },
+  "item": [
+    {
+      "name": "Goat Management",
+      "item": [
+        {
+          "name": "List All Goats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/goats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "goats"]
+            },
+            "description": "List all goats in the registry"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Text Goat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has goat data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"created successfully\");",
+                  "    pm.expect(responseJson.goat).to.be.an('object');",
+                  "    pm.expect(responseJson.goat.name).to.eql(\"test_text_goat\");",
+                  "    pm.expect(responseJson.goat.type).to.eql(\"text\");",
+                  "    ",
+                  "    // Store goat name for later tests",
+                  "    pm.environment.set(\"textGoatName\", responseJson.goat.name);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"test_text_goat\",\n    \"type\": \"text\",\n    \"description\": \"A test text goat\",\n    \"goat_path\": \"{{testDataPath}}/goats/test_text_goat\",\n    \"make_default\": true,\n    \"make_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/goats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "goats"]
+            },
+            "description": "Create a new text goat"
+          },
+          "response": []
+        },
+        {
+          "name": "Create MongoDB+PostgreSQL Goat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has goat data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"created successfully\");",
+                  "    pm.expect(responseJson.goat).to.be.an('object');",
+                  "    pm.expect(responseJson.goat.name).to.eql(\"test_mongopg_goat\");",
+                  "    pm.expect(responseJson.goat.type).to.eql(\"mongopg\");",
+                  "    ",
+                  "    // Store goat name for later tests",
+                  "    pm.environment.set(\"mongopgGoatName\", responseJson.goat.name);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"test_mongopg_goat\",\n    \"type\": \"mongopg\",\n    \"description\": \"A test MongoDB+PostgreSQL goat\",\n    \"mongodb_uri\": \"mongodb://localhost/test_mongopg_goat\",\n    \"postgres_uri\": \"sqlite:///{{testDataPath}}/databases/test_relationships.db\",\n    \"make_default\": false,\n    \"make_active\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/goats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "goats"]
+            },
+            "description": "Create a new MongoDB+PostgreSQL goat"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Registry Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has registry path\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.registry_path).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/registry",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "registry"]
+            },
+            "description": "Get the current registry path"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Registry Path",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 201\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"registry\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"path\": \"{{testDataPath}}/new_registry.json\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/registry",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "registry"]
+            },
+            "description": "Set a new registry path"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Goat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has active goat data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.active_goat).to.be.a('string');",
+                  "    pm.expect(responseJson.config).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat"]
+            },
+            "description": "Get the currently active goat"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Active Goat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has active goat data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"Active goat set to\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"{{mongopgGoatName}}\",\n    \"make_default\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat"]
+            },
+            "description": "Set the active goat"
+          },
+          "response": []
+        },
+        {
+          "name": "Set Text Goat as Active",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has active goat data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"Active goat set to\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"{{textGoatName}}\",\n    \"make_default\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat"]
+            },
+            "description": "Set the text goat as active"
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for managing goats"
+    },
+    {
+      "name": "Node Operations",
+      "item": [
+        {
+          "name": "Get All Nodes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes"]
+            },
+            "description": "Get all nodes from the active goat"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Node",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has node data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.nodeid).to.eql(\"test_node1\");",
+                  "    pm.expect(responseJson.nodename).to.eql(\"Test Node 1\");",
+                  "    pm.expect(responseJson.labels).to.include(\"Person\");",
+                  "    ",
+                  "    // Store node ID for later tests",
+                  "    pm.environment.set(\"testNodeId1\", responseJson.nodeid);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nodeid\": \"test_node1\",\n    \"nodename\": \"Test Node 1\",\n    \"labels\": [\"Person\", \"Employee\"],\n    \"description\": \"This is a test node\",\n    \"age\": 30,\n    \"department\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes"]
+            },
+            "description": "Create a new node"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Second Node",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has node data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.nodeid).to.eql(\"test_node2\");",
+                  "    pm.expect(responseJson.nodename).to.eql(\"Test Node 2\");",
+                  "    pm.expect(responseJson.labels).to.include(\"Company\");",
+                  "    ",
+                  "    // Store node ID for later tests",
+                  "    pm.environment.set(\"testNodeId2\", responseJson.nodeid);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nodeid\": \"test_node2\",\n    \"nodename\": \"Test Node 2\",\n    \"labels\": [\"Company\", \"Organization\"],\n    \"description\": \"This is a test company node\",\n    \"founded\": 2010,\n    \"industry\": \"Technology\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes"]
+            },
+            "description": "Create a second node for relationship testing"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Node by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has correct node data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.nodeid).to.eql(pm.environment.get(\"testNodeId1\"));",
+                  "    pm.expect(responseJson.nodename).to.eql(\"Test Node 1\");",
+                  "    pm.expect(responseJson.labels).to.include(\"Person\");",
+                  "    pm.expect(responseJson.description).to.eql(\"This is a test node\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{testNodeId1}}"]
+            },
+            "description": "Get a node by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Nodes by Label",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains person nodes\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.at.least(1);",
+                  "    ",
+                  "    // Verify the first node has the correct label",
+                  "    const node = responseJson[0];",
+                  "    pm.expect(node.labels).to.include(\"Person\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/label/Person",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "label", "Person"]
+            },
+            "description": "Get nodes by label"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Node",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has updated node data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.nodeid).to.eql(pm.environment.get(\"testNodeId1\"));",
+                  "    pm.expect(responseJson.nodename).to.eql(\"Updated Test Node\");",
+                  "    pm.expect(responseJson.labels).to.include(\"Person\");",
+                  "    pm.expect(responseJson.description).to.eql(\"This is an updated test node\");",
+                  "    pm.expect(responseJson.title).to.eql(\"Senior Engineer\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"nodename\": \"Updated Test Node\",\n    \"description\": \"This is an updated test node\",\n    \"title\": \"Senior Engineer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{testNodeId1}}"]
+            },
+            "description": "Update a node"
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for node operations"
+    },
+    {
+      "name": "Relationship Operations",
+      "item": [
+        {
+          "name": "Create Relationship",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has relationship data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.source_id).to.eql(pm.environment.get(\"testNodeId1\"));",
+                  "    pm.expect(responseJson.target_id).to.eql(pm.environment.get(\"testNodeId2\"));",
+                  "    pm.expect(responseJson.story).to.eql(\"WORKS_AT\");",
+                  "    ",
+                  "    // Store relationship ID for later tests",
+                  "    if (responseJson.relationship_id) {",
+                  "        pm.environment.set(\"testRelationshipId\", responseJson.relationship_id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"source\": \"{{testNodeId1}}\",\n    \"target\": \"{{testNodeId2}}\",\n    \"story\": \"WORKS_AT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships"]
+            },
+            "description": "Create a new relationship"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Relationships",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships"]
+            },
+            "description": "Get all relationships"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Relationships by Source",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains relationships from source\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.at.least(1);",
+                  "    ",
+                  "    // Verify relationships are from the specified source",
+                  "    responseJson.forEach(rel => {",
+                  "        pm.expect(rel.source_id).to.eql(pm.environment.get(\"testNodeId1\"));",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships?source={{testNodeId1}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships"],
+              "query": [
+                {
+                  "key": "source",
+                  "value": "{{testNodeId1}}"
+                }
+              ]
+            },
+            "description": "Get relationships by source node"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Relationships by Target",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains relationships to target\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.at.least(1);",
+                  "    ",
+                  "    // Verify relationships are to the specified target",
+                  "    responseJson.forEach(rel => {",
+                  "        pm.expect(rel.target_id).to.eql(pm.environment.get(\"testNodeId2\"));",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships?target={{testNodeId2}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships"],
+              "query": [
+                {
+                  "key": "target",
+                  "value": "{{testNodeId2}}"
+                }
+              ]
+            },
+            "description": "Get relationships by target node"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Relationships by Story",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response contains relationships with story\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('array');",
+                  "    pm.expect(responseJson.length).to.be.at.least(1);",
+                  "    ",
+                  "    // Verify relationships have the specified story",
+                  "    responseJson.forEach(rel => {",
+                  "        pm.expect(rel.story).to.eql(\"WORKS_AT\");",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships?story=WORKS_AT",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships"],
+              "query": [
+                {
+                  "key": "story",
+                  "value": "WORKS_AT"
+                }
+              ]
+            },
+            "description": "Get relationships by story (relationship type)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Relationship by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has relationship data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.source_id).to.eql(pm.environment.get(\"testNodeId1\"));",
+                  "    pm.expect(responseJson.target_id).to.eql(pm.environment.get(\"testNodeId2\"));",
+                  "    pm.expect(responseJson.story).to.eql(\"WORKS_AT\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships/{{testRelationshipId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships", "{{testRelationshipId}}"]
+            },
+            "description": "Get a relationship by ID"
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for relationship operations"
+    },
+    {
+      "name": "Goat-Specific Operations",
+      "item": [
+        {
+          "name": "Get Composition",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has composition data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('object');",
+                  "    pm.expect(responseJson).to.have.property('Person');",
+                  "    pm.expect(responseJson).to.have.property('Company');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat/composition",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat", "composition"]
+            },
+            "description": "Get the composition of nodes by label"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Taxonomy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has taxonomy data\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson).to.be.an('object');",
+                  "    pm.expect(responseJson).to.have.property('WORKS_AT');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat/taxonomy",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat", "taxonomy"]
+            },
+            "description": "Get the taxonomy of relationship types"
+          },
+          "response": []
+        },
+        {
+          "name": "Dump Relationships",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has dump message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"Successfully dumped\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"filename\": \"{{testDataPath}}/relationships_dump.txt\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/active-goat/dump-relationships",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "active-goat", "dump-relationships"]
+            },
+            "description": "Dump all relationships to a file"
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for goat-specific operations"
+    },
+    {
+      "name": "Cleanup",
+      "item": [
+        {
+          "name": "Delete Relationship",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"deleted successfully\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/relationships/{{testRelationshipId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "relationships", "{{testRelationshipId}}"]
+            },
+            "description": "Delete a relationship"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Node 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"deleted successfully\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{testNodeId1}}"]
+            },
+            "description": "Delete a node"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Node 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has message\", function () {",
+                  "    const responseJson = pm.response.json();",
+                  "    pm.expect(responseJson.message).to.include(\"deleted successfully\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nodes/{{testNodeId2}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nodes", "{{testNodeId2}}"]
+            },
+            "description": "Delete a node"
+          },
+          "response": []
+        }
+      ],
+      "description": "Cleanup endpoints"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "testDataPath",
+      "value": "/tmp/mojogoat_test_data",
+      "type": "string"
+    },
+    {
+      "key": "textGoatName",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mongopgGoatName",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testNodeId1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testNodeId2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testRelationshipId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

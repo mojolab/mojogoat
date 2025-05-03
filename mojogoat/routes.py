@@ -1,112 +1,268 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, current_app
 import json
-from mojogoat.mojogoat.goatbases.mongogoat.models import sqldb, Relationship, Node
-from mojogoat import *
-from mojogoat import controllers
+from datetime import datetime
+from functools import wraps
+from mojogoat.goatbases.mongogoat.models import sqldb, Relationship, Node
 
-# Listener
-@app.route('/listener', methods=["POST"])
-def listener():
-     input_json = request.get_json(force=True) 
-     input_json['timercvd'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")    
-     # send input_json to processing function
-     with open(goatlog, 'a') as f:
-         f.write(str(input_json) + '\n')
-     result = controllers.process_message(input_json)
-     result['timeresponded']=datetime.now().strftime("%Y-%m-%d %H:%M:%S IST") 
-     with open(goatlog, 'a') as f:
-         f.write(str(result) + '\n')
-     return jsonify(result)
+# Initialize the routes module
+def init_routes(app):
+    """Initialize the routes with the Flask app"""
+    register_routes(app)
 
-# Node
-@app.route('/nodes', methods=['GET'])
-def get_nodes():
-    result, status_code = controllers.get_nodes()
-    return jsonify(result), status_code
+# API Routes for CRUD operations on the active goat
 
-@app.route('/nodes/<nodeid>', methods=['GET'])
-def get_node(nodeid):
-    result, status_code = controllers.get_node(nodeid)
-    return jsonify(result), status_code
+# Module level active_goat reference
+_active_goat = None
 
-#Route to get nodes by label using controllers.get_nodes_by_label()
-@app.route('/nodes/label/<label>', methods=['GET'])
-def get_nodes_by_label(label):
-    result, status_code = controllers.get_nodes_by_label(label)
-    return jsonify(result), status_code
+def set_active_goat_ref(goat):
+    """Set the active goat reference for routes"""
+    global _active_goat
+    _active_goat = goat
+    
+def get_active_goat():
+    """Get active goat from the module"""
+    global _active_goat
+    
+    # If not set in the module, try to import from mojogoatapi
+    if _active_goat is None:
+        try:
+            from mojogoatapi import active_goat
+            _active_goat = active_goat
+        except (ImportError, AttributeError) as e:
+            print(f"Error getting active goat: {e}")
+    
+    return _active_goat
 
-'''
- Create a new mongonodes.Node from a POST request with a JSON payload. The JSON payload should contain a 'nodeid' field.
- If a mongonodes.Node already exists with the same 'nodeid' field, update the existing mongonodes.Node with the new data, else 
- create a new mongonodes.Node and return as JSON 
-'''
-@app.route('/nodes', methods=['POST'])
-@app.route('/nodes/<nodeid>', methods=['POST'])
-def add_node(nodeid=None):
-    body = request.get_json()
-    result, status_code = controllers.add_node(body)
-    return jsonify(result), status_code
+# Check if active goat is selected
+def check_active_goat():
+    active_goat = get_active_goat()
+    
+    # For debugging
+    import sys
+    print(f"check_active_goat called, active_goat is: {active_goat}", file=sys.stderr)
+    
+    if not active_goat:
+        # Try to get active goat from mojogoatapi again, in case it was set after initialization
+        try:
+            from mojogoatapi import active_goat as mojo_active_goat
+            if mojo_active_goat:
+                # Update our local reference
+                set_active_goat_ref(mojo_active_goat)
+                return None
+        except Exception as e:
+            print(f"Error trying to get active_goat from mojogoatapi: {e}", file=sys.stderr)
+            
+        return jsonify({"error": "No active goat selected"}), 404
+    return None
+    
+# Decorator to ensure an active goat is selected
+def requires_active_goat(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        error_response = check_active_goat()
+        if error_response:
+            return error_response
+        return f(*args, **kwargs)
+    return decorated_function
 
+# Reference to the Flask app
+_app = None
 
-# Relationship
-@app.route('/relationships', methods=['GET'])
-def get_relationships():
-    source = request.args.get('source')
-    target = request.args.get('target')
-    story = request.args.get('story')
+# Node Operations
+def register_routes(app):
+    """Register all routes with the Flask app"""
+    global _app
+    _app = app
+    
+    @app.route('/api/nodes', methods=['GET'])
+    @requires_active_goat
+    def get_nodes():
+        """Get all nodes from the active goat"""
+        try:
+            nodes = get_active_goat().get_nodes()
+            return jsonify(nodes), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get nodes: {str(e)}"}), 500
 
-    result, status_code = controllers.get_relationships(source=source, target=target, story=story)    
-    return jsonify(result), status_code
+    @app.route('/api/nodes/<nodeid>', methods=['GET'])
+    @requires_active_goat
+    def get_node(nodeid):
+        """Get a node by ID from the active goat"""
+        try:
+            node = get_active_goat().get_node(nodeid)
+            if not node:
+                return jsonify({"error": f"Node with ID '{nodeid}' not found"}), 404
+            return jsonify(node), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get node: {str(e)}"}), 500
 
+    @app.route('/api/nodes/label/<label>', methods=['GET'])
+    @requires_active_goat
+    def get_nodes_by_label(label):
+        """Get nodes by label from the active goat"""
+        try:
+            nodes = get_active_goat().get_nodes_by_label(label)
+            return jsonify(nodes), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get nodes by label: {str(e)}"}), 500
 
+    @app.route('/api/nodes', methods=['POST'])
+    @requires_active_goat
+    def add_node():
+        """Add a node to the active goat"""
+        data = request.json
+        if not data or not data.get("nodeid"):
+            return jsonify({"error": "Missing required field: nodeid"}), 400
+        
+        try:
+            # Create a copy of the data to avoid modifying the original
+            node_data = dict(data)
+            nodeid = node_data.pop("nodeid")
+            
+            # Pass nodeid separately and the rest as kwargs
+            node = get_active_goat().add_node(nodeid, **node_data)
+            return jsonify(node), 201
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": f"Failed to add node: {str(e)}"}), 500
 
+    @app.route('/api/nodes/<nodeid>', methods=['PUT'])
+    @requires_active_goat
+    def update_node(nodeid):
+        """Update a node in the active goat"""
+        data = request.json
+        if not data:
+            return jsonify({"error": "No update data provided"}), 400
+        
+        try:
+            # Ensure we're not passing nodeid in kwargs
+            node_data = dict(data)
+            if "nodeid" in node_data:
+                del node_data["nodeid"]
+                
+            # Add nodeid to the data for consistent identification
+            node_data["nodeid"] = nodeid
+            
+            # Update the node
+            node = get_active_goat().add_node(nodeid, **node_data)
+            return jsonify(node), 200
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": f"Failed to update node: {str(e)}"}), 500
 
-@app.route('/relationships', methods=['POST'])
-def create_relationship():
-    data = request.get_json()
-    result,status_code = controllers.create_relationship(data)
-    return jsonify(result), status_code
+    @app.route('/api/nodes/<nodeid>', methods=['DELETE'])
+    @requires_active_goat
+    def delete_node(nodeid):
+        """Delete a node from the active goat"""
+        try:
+            if get_active_goat().delete_node(nodeid):
+                return jsonify({"message": f"Node '{nodeid}' deleted successfully"}), 200
+            else:
+                return jsonify({"error": f"Node with ID '{nodeid}' not found"}), 404
+        except Exception as e:
+            return jsonify({"error": f"Failed to delete node: {str(e)}"}), 500
 
+    # Relationship Operations
+    @app.route('/api/relationships', methods=['GET'])
+    @requires_active_goat
+    def get_relationships():
+        """Get relationships from the active goat with optional filtering"""
+        source = request.args.get('source')
+        target = request.args.get('target')
+        story = request.args.get('story')
+        
+        try:
+            relationships = get_active_goat().get_relationships(source, target, story)
+            return jsonify(relationships), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get relationships: {str(e)}"}), 500
 
-@app.route('/relationships/<relationship_id>', methods=['DELETE'])
-def delete_relationship(relationship_id):
-    result,status_code  = controllers.delete_relationship_by_id(relationship_id)
-    return jsonify(result), status_code
+    @app.route('/api/relationships', methods=['POST'])
+    @requires_active_goat
+    def create_relationship():
+        """Create a relationship in the active goat"""
+        data = request.json
+        if not data or not data.get("source") or not data.get("target") or not data.get("story"):
+            return jsonify({"error": "Missing required fields: source, target, and story"}), 400
+        
+        try:
+            relationship = get_active_goat().create_relationship(
+                data.get("source"),
+                data.get("target"),
+                data.get("story")
+            )
+            
+            if not relationship:
+                return jsonify({"error": "Failed to create relationship. Nodes may not exist."}), 400
+            
+            return jsonify(relationship), 201
+        except Exception as e:
+            return jsonify({"error": f"Failed to create relationship: {str(e)}"}), 500
 
-# Route to search relationships by source, target or story fragment by sending a POST queryu to /relationships/search
-@app.route('/relationships/search', methods=['POST'])
-def search_relationships():
-    data = request.get_json()
-    result, status_code = controllers.get_relationships(**data)
-    return jsonify(result), status_code
+    @app.route('/api/relationships/<relationship_id>', methods=['GET'])
+    @requires_active_goat
+    def get_relationship(relationship_id):
+        """Get a relationship by ID from the active goat"""
+        try:
+            relationships = get_active_goat().get_relationships()
+            
+            # Find relationship by ID
+            for rel in relationships:
+                if str(rel.get("relationship_id")) == str(relationship_id):
+                    return jsonify(rel), 200
+            
+            return jsonify({"error": f"Relationship with ID '{relationship_id}' not found"}), 404
+        except Exception as e:
+            return jsonify({"error": f"Failed to get relationship: {str(e)}"}), 500
 
-@app.route('/relationships/<int:id>', methods=['GET'])
-def get_relationship_by_id(id):
-    # Get relationship by ID
-    result, status_code = controllers.get_relationship_by_id(id)
-    return jsonify(result), status_code
+    @app.route('/api/relationships/<relationship_id>', methods=['DELETE'])
+    @requires_active_goat
+    def delete_relationship(relationship_id):
+        """Delete a relationship from the active goat"""
+        try:
+            if get_active_goat().delete_relationship(relationship_id):
+                return jsonify({"message": f"Relationship '{relationship_id}' deleted successfully"}), 200
+            else:
+                return jsonify({"error": f"Relationship with ID '{relationship_id}' not found"}), 404
+        except Exception as e:
+            return jsonify({"error": f"Failed to delete relationship: {str(e)}"}), 500
 
-#App Route to delete node
-@app.route('/nodes/<nodeid>', methods=['DELETE'])
-def delete_node(nodeid):
-    result, status_code = controllers.delete_node_by_id(nodeid)
-    return jsonify(result), status_code
+    # Additional Goat Operations
+    @app.route('/api/active-goat/composition', methods=['GET'])
+    @requires_active_goat
+    def get_composition():
+        """Get the composition of nodes by label"""
+        try:
+            composition = get_active_goat().get_composition()
+            return jsonify(composition), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get composition: {str(e)}"}), 500
 
-#Route to get all labels using controller.get_labels()
-@app.route('/labels', methods=['GET'])
-def get_labels():
-    result, status_code = controllers.get_labels()
-    return jsonify(result), status_code
+    @app.route('/api/active-goat/taxonomy', methods=['GET'])
+    @requires_active_goat
+    def get_taxonomy():
+        """Get the taxonomy of relationship types"""
+        try:
+            taxonomy = get_active_goat().get_taxonomy()
+            return jsonify(taxonomy), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to get taxonomy: {str(e)}"}), 500
 
-#Route to get all node ids for a label using controller.get_nodeids_by_label()
-@app.route('/nodeids/<label>', methods=['GET'])
-def get_nodeids_by_label(label):
-    result, status_code = controllers.get_nodeids_by_label(label)
-    return jsonify(result), status_code
-
-#Route to get all node ids using controller.get_nodeids()
-@app.route('/nodeids', methods=['GET'])
-def get_nodeids():
-    result, status_code = controllers.get_nodeids()
-    return jsonify(result), status_code
+    @app.route('/api/active-goat/dump-relationships', methods=['POST'])
+    @requires_active_goat
+    def dump_relationships():
+        """Dump all relationships to a file"""
+        data = request.json
+        if not data or not data.get("filename"):
+            return jsonify({"error": "Missing required field: filename"}), 400
+        
+        try:
+            count = get_active_goat().dump_all_rels(data.get("filename"))
+            return jsonify({
+                "message": f"Successfully dumped {count} relationships to {data.get('filename')}"
+            }), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to dump relationships: {str(e)}"}), 500
 
