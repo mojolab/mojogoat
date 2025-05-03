@@ -47,26 +47,74 @@ def delete_textgoat_node(config, node_id):
         os.remove(node_path)
 
 # MongoDB CRUD Operations
-from mongoengine import Document, StringField
+from mongoengine import Document, StringField, ListField, DateTimeField
+import json
+from datetime import datetime
 
-class Node(Document):
-    node_id = StringField(required=True, unique=True)
-    data = StringField()
+# Import the Node class from the models module
+from mojogoat.goatbases.mongogoat.models import Node
 
-def create_mongo_node(node_id, data):
-    node = Node(node_id=node_id, data=json.dumps(data))
+def create_mongo_node(nodeid, data):
+    """Create a new MongoDB node with provided data
+    
+    Args:
+        nodeid: Unique identifier for the node
+        data: Dictionary containing node data
+    
+    Returns:
+        Created node object
+    """
+    node = Node.objects(nodeid=nodeid).first()
+    if node is None:
+        node = Node(nodeid=nodeid)
+        
+    # Update node with data
+    for key, value in data.items():
+        setattr(node, key, value)
+    
     node.save()
+    return node
 
-def read_mongo_node(node_id):
-    return Node.objects(node_id=node_id).first()
+def read_mongo_node(nodeid):
+    """Read a MongoDB node by its ID
+    
+    Args:
+        nodeid: Unique identifier for the node
+    
+    Returns:
+        Node object if found, None otherwise
+    """
+    return Node.objects(nodeid=nodeid).first()
 
-def update_mongo_node(node_id, updates):
-    node = read_mongo_node(node_id)
+def update_mongo_node(nodeid, updates):
+    """Update a MongoDB node with new data
+    
+    Args:
+        nodeid: Unique identifier for the node
+        updates: Dictionary containing node updates
+    
+    Returns:
+        Updated node object if found, None otherwise
+    """
+    node = read_mongo_node(nodeid)
     if node:
-        node.data = json.dumps(updates)
+        node.update(**updates)
         node.save()
+        node.reload()
+        return node
+    return None
 
-def delete_mongo_node(node_id):
-    node = read_mongo_node(node_id)
+def delete_mongo_node(nodeid):
+    """Delete a MongoDB node by its ID
+    
+    Args:
+        nodeid: Unique identifier for the node
+    
+    Returns:
+        True if node was deleted, False otherwise
+    """
+    node = read_mongo_node(nodeid)
     if node:
         node.delete()
+        return True
+    return False

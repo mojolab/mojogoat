@@ -1,0 +1,1 @@
+{"mongodb_uri": "mongodb://localhost/mojogoat_test", "postgres_uri": "sqlite:///test_relationships.db", "debug": true, "testing": true}

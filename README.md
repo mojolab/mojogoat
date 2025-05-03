@@ -146,3 +146,54 @@ Neo4j offers a free instance for small-scale projects and experimentation.
 
 By completing these steps, you’ll have a fully functional MojoGOAT system ready to organize, query, and explore interconnected data using Neo4j and Jupyter Notebook.
 
+
+---
+
+## API Usage
+
+MojoGOAT provides a comprehensive REST API for interacting with goat databases. The API allows you to:
+
+1. **Manage Goats**
+   - Create and register different types of goat databases (text, Neo4j, MongoDB+PostgreSQL)
+   - Select active goat for operations
+   - Specify registry location
+
+2. **Node Operations**
+   - Create, read, update, and delete nodes
+   - Query nodes by ID or label
+
+3. **Relationship Operations**
+   - Create, read, and delete relationships
+   - Query relationships by source, target, or story
+
+For detailed API documentation, see `API_README.md`.
+
+## Testing Framework
+
+MojoGOAT includes a comprehensive testing framework to validate its functionality:
+
+1. **API Unit Tests**
+   - Python unittest framework for API endpoint testing
+   - Located in `/test/test_api.py` and `/test/test_api_crud.py`
+
+2. **CLI Test Tool**
+   - Command-line tool for testing all API endpoints
+   - Located in `/test/test_api_cli.py`
+
+3. **Postman Collection**
+   - GUI-based API testing using Postman
+   - Located in `/postman/MojoGOAT_API_Tests.postman_collection.json`
+
+4. **MongoDB+PostgreSQL Tests**
+   - Validate the hybrid database functionality
+   - Located in `/test/test_mongodbpostgres_*.py`
+
+To run all tests:
+
+```bash
+cd /xpal-src/mojogoat/test
+./run_all_tests.sh
+```
+
+For detailed testing documentation, see `API_TEST_README.md`.
+EOL < /dev/null
