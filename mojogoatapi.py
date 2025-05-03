@@ -58,16 +58,18 @@ def initialize_app(registry_file=None):
             app.logger.info(f"Loaded registry with {len(registry.get('goats', []))} goats")
         except Exception as e:
             app.logger.error(f"Error loading registry: {str(e)}")
-            registry = {"goats": [], "default": None}
+            registry = {"goats": [], "default": None, "active": None}
     else:
         # Create default registry
-        registry = {"goats": [], "default": None}
+        registry = {"goats": [], "default": None, "active": None}
         app.logger.info(f"Creating new registry at {registry_path}")
         save_registry()
     
-    # Set active goat if default is specified
-    if registry.get("default"):
-        set_active_goat(registry["default"])
+    # Set active goat
+    # First try the active field, then fall back to default
+    active_goat_name_from_registry = registry.get("active") or registry.get("default")
+    if active_goat_name_from_registry:
+        set_active_goat(active_goat_name_from_registry)
 
 def save_registry():
     """Save the registry to the registry file"""
@@ -97,23 +99,25 @@ def set_active_goat(goat_name):
     # Initialize the appropriate goat type
     goat_type = goat_config.get("type")
     
-    if goat_type == "text":
-        from mojogoat.goatbases.textgoat import TextGoat
-        active_goat = TextGoat(goat_config)
-    elif goat_type == "neo4j":
-        try:
-            # Try to import from both neo4j goat implementations
+    success = False
+    try:
+        if goat_type == "text":
+            from mojogoat.goatbases.textgoat import TextGoat
+            active_goat = TextGoat(goat_config)
+            success = True
+        elif goat_type == "neo4j":
             try:
-                from mojogoat.goatbases.newneo4jgoatcopilot import Neo4jGoat
+                # Try to import from both neo4j goat implementations
+                try:
+                    from mojogoat.goatbases.newneo4jgoatcopilot import Neo4jGoat
+                except ImportError:
+                    from mojogoat.goatbases.neo4jgoat import Neo4jGoat
+                    
+                active_goat = Neo4jGoat(goat_config.get("config_path"))
+                success = True
             except ImportError:
-                from mojogoat.goatbases.neo4jgoat import Neo4jGoat
-                
-            active_goat = Neo4jGoat(goat_config.get("config_path"))
-        except ImportError:
-            app.logger.error("Failed to import Neo4jGoat")
-            return False
-    elif goat_type == "mongopg":
-        try:
+                app.logger.error("Failed to import Neo4jGoat")
+        elif goat_type == "mongopg":
             # Configure the app for MongoDB and PostgreSQL
             app.config['SQLALCHEMY_DATABASE_URI'] = goat_config.get("postgres_uri", "postgresql://postgres:postgres@localhost:5432/xetrapal")
             app.config['MONGODB_SETTINGS'] = {
@@ -122,30 +126,40 @@ def set_active_goat(goat_name):
             
             # For testing purposes, use a special approach
             # This avoids 'AssertionError: The setup method ... can no longer be called'
-            if app.config['TESTING']:
+            if app.config.get('TESTING', False):
                 # For test environment, create a simple MongoDBPostgresGoat-like object
                 from mojogoat.goatbases.mongogoat.models import MongoDBPostgresGoat
                 active_goat = MongoDBPostgresGoat(goat_config)
+                success = True
             else:
                 # Initialize database connections for production
                 try:
                     sqldb.init_app(app)
                     mongodb.init_app(app)
+                    
+                    # Create a MongoDB+PostgreSQL goat handler
+                    from mojogoat.goatbases.mongogoat.models import MongoDBPostgresGoat
+                    active_goat = MongoDBPostgresGoat(goat_config)
+                    success = True
                 except Exception as e:
                     app.logger.error(f"Failed to initialize database connections: {str(e)}")
-                    return False
-                
-                # Create a MongoDB+PostgreSQL goat handler
-                from mojogoat.goatbases.mongogoat.models import MongoDBPostgresGoat
-                active_goat = MongoDBPostgresGoat(goat_config)
-        except Exception as e:
-            app.logger.error(f"Failed to set up mongopg goat: {str(e)}")
-            return False
-    else:
-        return False
+        else:
+            app.logger.error(f"Unsupported goat type: {goat_type}")
+    except Exception as e:
+        app.logger.error(f"Failed to set up goat: {str(e)}")
     
-    active_goat_name = goat_name
-    return True
+    if success:
+        active_goat_name = goat_name
+        
+        # Update the active goat reference in routes
+        try:
+            from mojogoat.routes import set_active_goat_ref
+            set_active_goat_ref(active_goat)
+            app.logger.info(f"Set active goat reference for routes: {goat_name}")
+        except Exception as e:
+            app.logger.error(f"Failed to update routes with active goat: {str(e)}")
+    
+    return success
 
 # API Routes
 
@@ -155,7 +169,8 @@ def list_goats():
     return jsonify({
         "goats": registry.get("goats", []),
         "default": registry.get("default"),
-        "active": active_goat_name
+        "active": active_goat_name,
+        "registry_active": registry.get("active")
     })
 
 @app.route('/api/goats', methods=['POST'])
@@ -212,11 +227,15 @@ def create_goat():
     if data.get("make_default", False) or len(registry.get("goats", [])) == 1:
         registry["default"] = data.get("name")
     
+    # Set as active if requested
+    if data.get("make_active", False):
+        registry["active"] = data.get("name")
+    
     # Save registry
     if not save_registry():
         return jsonify({"error": "Failed to save registry"}), 500
     
-    # Set as active if requested
+    # Set as active goat in memory if requested
     if data.get("make_active", False):
         if not set_active_goat(data.get("name")):
             return jsonify({"error": "Failed to set as active goat"}), 500
@@ -297,7 +316,9 @@ def get_active_goat():
     
     return jsonify({
         "active_goat": active_goat_name,
-        "config": goat_config
+        "config": goat_config,
+        "is_default": registry.get("default") == active_goat_name,
+        "is_registry_active": registry.get("active") == active_goat_name
     })
 
 @app.route('/api/active-goat', methods=['POST'])
@@ -322,15 +343,66 @@ def set_active_goat_api():
     if not set_active_goat(data.get("name")):
         return jsonify({"error": f"Failed to set '{data.get('name')}' as active goat"}), 500
     
+    # Update registry with active goat
+    registry["active"] = data.get("name")
+    
     # Update default if requested
     if data.get("make_default", False):
         registry["default"] = data.get("name")
-        save_registry()
+    
+    # Save registry
+    save_registry()
     
     return jsonify({"message": f"Active goat set to '{data.get('name')}'"}), 200
 
-# Import the routes for CRUD operations
-from mojogoat import routes
+# Add a direct endpoint for nodes to bypass the routes module
+@app.route('/api/direct/nodes', methods=['GET'])
+def direct_get_nodes():
+    """Direct endpoint to get nodes bypassing the routes module"""
+    if not active_goat:
+        return jsonify({"error": "No active goat in direct route"}), 404
+    
+    try:
+        nodes = active_goat.get_nodes()
+        return jsonify(nodes), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to get nodes: {str(e)}"}), 500
+
+# Add a debug endpoint
+@app.route('/api/debug', methods=['GET'])
+def debug_info():
+    """Get debug information about the current state"""
+    from mojogoat.routes import get_active_goat as routes_get_active_goat
+    
+    routes_active_goat = routes_get_active_goat()
+    
+    return jsonify({
+        "api_active_goat": {
+            "name": active_goat_name,
+            "type": str(type(active_goat)) if active_goat else None,
+            "is_none": active_goat is None
+        },
+        "routes_active_goat": {
+            "type": str(type(routes_active_goat)) if routes_active_goat else None,
+            "is_none": routes_active_goat is None,
+            "is_same_instance": routes_active_goat is active_goat
+        },
+        "registry": {
+            "path": registry_path,
+            "default": registry.get("default"),
+            "active": registry.get("active"),
+            "goat_count": len(registry.get("goats", []))
+        }
+    }), 200
+
+# Import and initialize routes for CRUD operations
+from mojogoat.routes import init_routes, set_active_goat_ref
+
+# Set the active goat reference for routes
+set_active_goat_ref(active_goat)
+
+# Initialize routes
+init_routes(app)
 
 # Initialize the app with command line arguments if provided
 if __name__ == '__main__':
