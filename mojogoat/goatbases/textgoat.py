@@ -308,6 +308,38 @@ class TextGoat:
         except Exception:
             return False
 
+    async def update_relationship_props(self, relationship_id: str, **props) -> bool:
+        """Merge *props* into an existing relationship. Returns True if found.
+
+        The relationship_id, source, story, target, and timestamp are never
+        changed — only the extra properties are updated.
+        """
+        try:
+            lines = await self._read_rel_lines()
+            new_lines = []
+            found = False
+            for line in lines:
+                parts = line.split("|")
+                rid = self._rel_id_from_line(line, parts)
+                if rid == relationship_id:
+                    found = True
+                    existing_props: dict = {}
+                    if len(parts) >= 6:
+                        try:
+                            existing_props = json.loads("|".join(parts[5:]))
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                    existing_props.update(props)
+                    base = "|".join(parts[:5])
+                    line = f"{base}|{json.dumps(existing_props, separators=(',', ':'))}"
+                new_lines.append(line)
+            if not found:
+                return False
+            await self._write_rel_lines(new_lines)
+            return True
+        except Exception:
+            return False
+
     # ------------------------------------------------------------------
     # Analytics
     # ------------------------------------------------------------------

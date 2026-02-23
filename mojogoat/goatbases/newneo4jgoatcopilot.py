@@ -118,13 +118,13 @@ class Neo4jGoat:
             conditions.append("m.nodeid = $target")
             params['target'] = target
         if story:
-            conditions.append("r.story = $story")
+            conditions.append("$story IN r.stories")
             params['story'] = story
 
         where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
         query = (
-            f"MATCH (n)-[r:LINKED_TO]->(m){where_clause} "
-            "RETURN n.nodeid AS src, r.story AS story, m.nodeid AS tgt, "
+            f"MATCH (n)-[r:is_connected_to]->(m){where_clause} "
+            "RETURN n.nodeid AS src, r.stories AS stories, m.nodeid AS tgt, "
             "r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props"
         )
 
@@ -132,13 +132,14 @@ class Neo4jGoat:
         async with self.driver.session() as session:
             result = await session.run(query, **params)
             async for record in result:
+                stories = record["stories"] or []
                 extra = {
                     k: v for k, v in (record["props"] or {}).items()
-                    if k not in ("story", "timestamp", "relationship_id", "updatedate")
+                    if k not in ("stories", "timestamp", "relationship_id")
                 }
                 rels.append({
                     "source_id": record["src"],
-                    "story": record["story"],
+                    "story": stories[0] if stories else "",
                     "target_id": record["tgt"],
                     "timestamp": record["ts"],
                     "relationship_id": record["rid"],
@@ -153,11 +154,11 @@ class Neo4jGoat:
         story: str,
         **props,
     ) -> dict | None:
-        """Create a LINKED_TO relationship between two nodes."""
+        """Create an is_connected_to relationship between two nodes."""
         rel_id = str(uuid4())
         ts = datetime.now().isoformat()
         rel_props = {
-            "story": story,
+            "stories": [story],
             "timestamp": ts,
             "relationship_id": rel_id,
             **props,
@@ -165,7 +166,7 @@ class Neo4jGoat:
         async with self.driver.session() as session:
             result = await session.run(
                 "MATCH (n {nodeid: $src}), (m {nodeid: $tgt}) "
-                "CREATE (n)-[r:LINKED_TO]->(m) SET r += $props "
+                "CREATE (n)-[r:is_connected_to]->(m) SET r += $props "
                 "RETURN r",
                 src=source, tgt=target, props=rel_props,
             )
@@ -185,9 +186,24 @@ class Neo4jGoat:
         """Delete a relationship by its UUID property."""
         async with self.driver.session() as session:
             result = await session.run(
-                "MATCH ()-[r:LINKED_TO {relationship_id: $rid}]->() "
+                "MATCH ()-[r:is_connected_to {relationship_id: $rid}]->() "
                 "DELETE r RETURN count(r) AS cnt",
                 rid=relationship_id,
+            )
+            record = await result.single()
+            return bool(record and record["cnt"] > 0)
+
+    async def update_relationship_props(self, relationship_id: str, **props) -> bool:
+        """Merge *props* into an existing relationship. Returns True if found.
+
+        The relationship_id, source, story, target, and timestamp are never
+        changed — only the extra properties are updated.
+        """
+        async with self.driver.session() as session:
+            result = await session.run(
+                "MATCH ()-[r:is_connected_to {relationship_id: $rid}]->() "
+                "SET r += $props RETURN count(r) AS cnt",
+                rid=relationship_id, props=props,
             )
             record = await result.single()
             return bool(record and record["cnt"] > 0)
@@ -213,7 +229,9 @@ class Neo4jGoat:
         taxonomy: dict[str, int] = {}
         async with self.driver.session() as session:
             result = await session.run(
-                "MATCH ()-[r:LINKED_TO]->() RETURN r.story AS story, count(r) AS cnt"
+                "MATCH ()-[r:is_connected_to]->() "
+                "UNWIND r.stories AS story "
+                "RETURN story, count(story) AS cnt"
             )
             async for record in result:
                 story = record["story"] or "unknown"
@@ -242,23 +260,22 @@ class Neo4jGoat:
         storyline: str,
         adddate: str,
     ) -> None:
-        """Low-level: merge a LINKED_TO relationship."""
+        """Low-level: merge an is_connected_to relationship."""
         async with self.driver.session() as session:
             await session.run(
                 "MATCH (x {nodeid: $x}), (y {nodeid: $y}) "
-                "MERGE (x)-[r:LINKED_TO]->(y) "
-                "SET r.story = $story, r.adddate = $adddate, "
-                "r.timestamp = $ts, r.updatedate = $upd",
+                "MERGE (x)-[r:is_connected_to]->(y) "
+                "SET r.stories = [$story], r.timestamp = $ts, r.updatedate = $upd",
                 x=x_nodeid, y=y_nodeid, story=storyline,
-                adddate=adddate, ts=adddate, upd=datetime.now().isoformat(),
+                ts=adddate, upd=datetime.now().isoformat(),
             )
 
     async def link_is(self, node1_id: str, node2_id: str) -> None:
         async with self.driver.session() as session:
             await session.run(
                 "MATCH (n1 {nodeid: $n1}), (n2 {nodeid: $n2}) "
-                "MERGE (n1)-[:IS_THE_SAME_AS]->(n2) "
-                "MERGE (n2)-[:IS_THE_SAME_AS]->(n1)",
+                "MERGE (n1)-[:is_the_same_as]->(n2) "
+                "MERGE (n2)-[:is_the_same_as]->(n1)",
                 n1=node1_id, n2=node2_id,
             )
 

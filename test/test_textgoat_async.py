@@ -158,6 +158,49 @@ async def test_delete_nonexistent_relationship(goat):
 
 
 @pytest.mark.asyncio
+async def test_update_relationship_props_merges(goat):
+    await goat.add_node("a")
+    await goat.add_node("b")
+    rel = await goat.create_relationship("a", "b", "KNOWS", state="pending")
+    rid = rel["relationship_id"]
+
+    result = await goat.update_relationship_props(rid, state="confirmed", score=42)
+    assert result is True
+
+    rels = await goat.get_relationships()
+    assert len(rels) == 1
+    assert rels[0]["relationship_id"] == rid   # ID preserved
+    assert rels[0]["state"] == "confirmed"      # updated
+    assert rels[0]["score"] == 42               # new prop added
+    assert rels[0]["story"] == "KNOWS"          # unchanged
+    assert rels[0]["source_id"] == "a"          # unchanged
+
+
+@pytest.mark.asyncio
+async def test_update_relationship_props_not_found(goat):
+    result = await goat.update_relationship_props(
+        "00000000-0000-0000-0000-000000000000", state="confirmed"
+    )
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_update_relationship_props_preserves_other_rels(goat):
+    await goat.add_node("a")
+    await goat.add_node("b")
+    await goat.add_node("c")
+    rel1 = await goat.create_relationship("a", "b", "KNOWS", state="pending")
+    rel2 = await goat.create_relationship("a", "c", "LIKES", state="pending")
+
+    await goat.update_relationship_props(rel1["relationship_id"], state="confirmed")
+
+    rels = await goat.get_relationships()
+    by_id = {r["relationship_id"]: r for r in rels}
+    assert by_id[rel1["relationship_id"]]["state"] == "confirmed"
+    assert by_id[rel2["relationship_id"]]["state"] == "pending"  # untouched
+
+
+@pytest.mark.asyncio
 async def test_iso8601_timestamp(goat):
     await goat.add_node("a")
     await goat.add_node("b")
