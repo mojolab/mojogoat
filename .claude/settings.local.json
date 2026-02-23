@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:docs.falkordb.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git diff -w HEAD -- mojogoat/goatbases/newneo4jgoatcopilot.py | head -40)",
+      "Bash(git diff -w HEAD -- tasks/lessons.md)"
     ]
   }
 }
