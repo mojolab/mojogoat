@@ -24,11 +24,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-legacy = [
-    # py2neo is used by the old neo4jgoat.py only.
-    # Target: retire neo4jgoat.py and remove this group entirely.
-    "py2neo>=2021.2",
-]
 falkordb = [
     "falkordb>=1.0",
 ]

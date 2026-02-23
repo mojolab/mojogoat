@@ -1,99 +1,97 @@
 # MojoGOAT Architecture
 
-## The Quad Structure
+> **Note:** `CLAUDE.md` is the authoritative reference for development guidelines.
+> This document describes the runtime architecture for general readers.
 
-MojoGOAT organizes information using a semantic structure called a "quad" that consists of four parts:
+---
 
-1. **Source Node (Subject)**: The entity that initiates the relationship
-2. **Story (Predicate)**: The nature of the relationship between entities
-3. **Target Node (Object)**: The entity that receives the relationship
-4. **Timestamp (Context)**: When the relationship was established or recorded
+## The Quad Model
 
-Example of a quad:
+MojoGOAT stores typed relationships as quads:
+
 ```
-PersonA|knows|PersonB|2025-01-05
+source | story | target | timestamp | relationship_id | **props
 ```
 
-This structure extends the traditional semantic triple (subject-predicate-object) by adding a temporal component, allowing for time-based queries and historical analysis of relationships.
+| Field | Type | Notes |
+|---|---|---|
+| `source` | string | Source node ID |
+| `story` | string | Relationship type — domain-agnostic, never validated |
+| `target` | string | Target node ID |
+| `timestamp` | ISO-8601 string | Set at write time |
+| `relationship_id` | UUID v4 string | Set at write time, never an integer |
+| `**props` | key-value pairs | Stored and returned as-is |
 
-Quads are stored in various formats depending on the storage backend:
-- As pipe-delimited text in text files
-- As graph relationships in Neo4j
-- As relationship records in PostgreSQL with references to MongoDB documents
+Example:
+```
+alice|navigated to|dashboard|2026-02-23T14:22:01.123456|3f2e1a...|state=pending
+```
+
+---
 
 ## Storage Backends
 
-MojoGOAT implements multiple storage backends ("goatbases") that can be used interchangeably:
+All backends implement the same async interface and are drop-in replacements.
 
-### 1. Neo4j Graph Database
+### TextGoat (`goatbases/textgoat.py`)
 
-**Implementation**: `neo4jgoat.py` and `newneo4jgoat.py`
+File-based storage — no external services required.
 
-- Uses py2neo to interact with Neo4j
-- Represents quads as graph relationships between nodes
-- Provides native graph traversal and visualization capabilities
-- Supports graph algorithms for advanced analysis
-- Nodes have labels and properties corresponding to their attributes
-- Relationships have types (the "story") and properties (including timestamp)
+- Nodes stored as JSON files under `{goatpath}/nodes/{nodeid}`
+- Relationships stored as pipe-delimited lines in snapshot files under `{goatpath}/snapshots/`
+- `goatrels.gq` holds a pointer to the current snapshot file
+- Extra props stored as a JSON blob in field 6 of each line
 
-**Strengths**:
-- Native graph structure and optimized for relationship queries
-- Powerful visualization and traversal capabilities
-- Supports complex graph algorithms
+**Use for**: development, testing, local datastores, git-versioned data.
 
-### 2. Text-based Storage
+### Neo4jGoat (`goatbases/newneo4jgoatcopilot.py`)
 
-**Implementation**: `textgoat.py`
+Async Neo4j backend using the official `neo4j` driver.
 
-- Stores nodes as JSON files in a directory structure
-- Stores relationships as pipe-delimited text in plain files
-- Uses simple file operations for data management
-- Supports Git-based versioning for data changes
-- Organizes data in `nodes` and `snapshots` directories
+- Two Cypher relationship types: `is_connected_to` and `is_the_same_as`
+- `story` stored in a `stories` list property: `WHERE $story IN r.stories`
+- `relationship_id` stored as a property on the edge
 
-**Strengths**:
-- Simple, portable storage without database dependencies
-- Human-readable format
-- Natural Git integration for versioning
-- Easy backup and migration
+**Use for**: production graph workloads requiring traversal and graph algorithms.
 
-### 3. MongoDB + PostgreSQL Hybrid
+### FalkorGoat (`goatbases/falkorgoat.py`)
 
-**Implementation**: `mongogoat/models.py` and related controllers
+Async FalkorDB backend (Redis-based graph, Cypher query language).
 
-- **MongoDB**: Stores node documents with flexible schemas
-  - Uses mongoengine for ODM (Object Document Mapping)
-  - Supports dynamic properties on nodes
-  - Handles specialized node types like Person, Contact, etc.
-  
-- **PostgreSQL**: Stores relationship records as structured data
-  - Uses SQLAlchemy for ORM (Object Relational Mapping)
-  - Represents quads as records with source_id, target_id, story, and timestamp
-  - Provides strong consistency for relationship data
+- Same two-type Cypher model as Neo4jGoat
+- Uses `falkordb.asyncio` client
+- FalkorDB is the development graph backend for Xetrapal Phase 1
 
-**Strengths**:
-- MongoDB's flexibility for varied node attributes
-- PostgreSQL's reliability for relationship integrity
-- SQL capabilities for complex relationship queries
-- MongoDB's document model for rich node data
+**Use for**: Xetrapal Phase 1 integration, development environments with Redis.
 
-## CRUD Operations
+### MongoDB + PostgreSQL (`goatbases/mongogoat/`) — deferred
 
-MojoGOAT provides standardized CRUD operations across all storage backends:
+Hybrid backend: MongoDB for node documents, PostgreSQL for relationship records.
 
-- **Create**: Add new nodes and relationships
-- **Read**: Query nodes by ID or properties, search relationships
-- **Update**: Modify node properties or relationship attributes
-- **Delete**: Remove nodes or relationships
+- **Status**: implementation exists but async migration is deferred
+- Do not modify until TextGoat and Neo4jGoat are stable
 
-Each implementation provides consistent methods despite different underlying storage technologies.
+---
 
-## Synchronization
+## Flask REST API (`mojogoatapi.py`)
 
-The `mojogoatsync.py` service ensures data consistency across different storage backends by:
-1. Detecting differences between node sets in different stores
-2. Copying missing nodes and relationships as needed
-3. Updating node labels and properties to ensure consistency
-4. Running periodically to keep all systems in sync
+A registry-backed HTTP API for managing multiple named goat instances.
 
-This architecture allows MojoGOAT to leverage the strengths of different storage systems while maintaining a consistent data model and interface.
+- Not used by Xetrapal directly — Xetrapal imports goat classes as a Python library
+- Registry stored at `$MOJOGOAT_REGISTRY` (default: `/xpal-data/conf/goat_registry.json`)
+- Supports `text`, `neo4j`, and `mongopg` goat types
+
+---
+
+## Xetrapal Integration
+
+Xetrapal (`/xpal-src/xetrapal3`) references MojoGOAT as an editable dependency:
+
+```toml
+# xetrapal3/pyproject.toml
+[tool.uv.sources]
+mojogoat = { path = "../mojogoat", editable = true }
+```
+
+Xetrapal's `SmritiGraph` layer wraps `FalkorGoat` and adds domain logic
+(validation states, URI schemes, etc.). MojoGOAT itself remains domain-agnostic.
