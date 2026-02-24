@@ -17,8 +17,94 @@ All Phase 1 tasks are complete:
 
 ---
 
-## Item 2 — FalkorDBSmritiGraph in xetrapal3
+## Item 2 — SmritiGraph adapter — SUPERSEDED
 
-**Context:** Lives in `/xpal-src/xetrapal3` — the SmritiGraph adapter over FalkorGoat.
-**Prerequisite:** Item 1 (v0.2.0 tag) must be done first.
-**Cross-reference:** See Phase 1 plan in `/xpal-src/xetrapal3/tasks/todo.md`.
+~~FalkorDBSmritiGraph as a Python library wrapper~~ — architecture changed (2026-02-24).
+
+Xetrapal now uses `MojoGoatSmritiGraph`, an HTTP client to the MojoGOAT REST API
+(`xetrapal/smriti/mojogoat.py`). Xetrapal does not import FalkorGoat directly.
+All graph operations go through `http://localhost:5000`.
+
+**No action needed on MojoGOAT side** — just ensure Items 6 and 7 are resolved so
+Xetrapal gets full confirm/invalidate persistence and FalkorDB as the backend.
+
+---
+
+## Item 3 — Add `get_relationship(relationship_id)` to GoatBase + FalkorGoat ✅
+
+Done 2026-02-24. Added to GoatBase (abstract), FalkorGoat, TextGoat, Neo4jGoat.
+Tests added to test_falkorgoat_async.py and test_textgoat_async.py.
+
+---
+
+## Item 4 — Add `props` filter + `limit` to `get_relationships()` ✅
+
+Done 2026-02-24. Added `props: dict | None` and `limit: int | None` to GoatBase,
+FalkorGoat (Cypher WHERE + LIMIT), TextGoat (post-filter + early break), Neo4jGoat.
+Tests added to test_falkorgoat_async.py and test_textgoat_async.py.
+
+---
+
+## Item 5 — Bump pyproject.toml version to 0.2.0 ✅
+
+Done 2026-02-24. pyproject.toml now reads `version = "0.2.0"`.
+
+---
+
+## Item 6 — Add `PATCH /api/relationships/<id>` for property updates
+
+**Found during:** Xetrapal MojoGoatSmritiGraph integration (2026-02-24).
+
+`POST /api/relationships` and `DELETE /api/relationships/<id>` exist, but there is no
+way to update a relationship's properties in-place. Xetrapal needs this to implement
+`SmritiGraph.confirm()` and `SmritiGraph.invalidate()` — both transition the
+`smriti_state` property on an existing relationship.
+
+Without this, Xetrapal falls back to an in-memory state overlay (lost on restart).
+
+**Required addition to `mojogoatapi.py`:**
+```python
+@app.route('/api/relationships/<relationship_id>', methods=['PATCH'])
+def update_relationship(relationship_id):
+    """Update properties on an existing relationship."""
+    data = request.json or {}
+    success = asyncio.run(active_goat.update_relationship_props(relationship_id, **data))
+    if not success:
+        return jsonify({"error": "Relationship not found"}), 404
+    return jsonify({"message": "Updated", "relationship_id": relationship_id})
+```
+
+Tests: add `test_patch_relationship_updates_state` to test suite.
+Xetrapal integration test: `tests/integration/test_mojogoat_api.py::test_item6_patch_relationship`
+
+---
+
+## Item 7 — Add FalkorDB backend support to REST API
+
+**Found during:** Xetrapal setup (2026-02-24).
+
+`POST /api/goats` only handles `type: "text"` and `type: "neo4j"`. FalkorDB is supported
+in the Python library (`FalkorGoat`) but not exposed via the REST API.
+
+**Required addition to `mojogoatapi.py`** (in `create_goat()` and `set_active_goat()`):
+```python
+elif data.get("type") == "falkordb":
+    goat_config["host"] = data.get("host", "localhost")
+    goat_config["port"] = int(data.get("port", 6379))
+    goat_config["graph_name"] = data.get("graph_name", "mojogoat")
+    # In set_active_goat():
+    from mojogoat.goatbases.falkorgoat import FalkorGoat
+    active_goat = FalkorGoat(
+        host=goat_config["host"],
+        port=goat_config["port"],
+        graph_name=goat_config.get("graph_name", "mojogoat"),
+    )
+```
+
+Tests: add `test_create_falkordb_goat` (integration, requires FalkorDB on :6379).
+Xetrapal integration test: `tests/integration/test_mojogoat_api.py::test_item7_falkordb_backend`
+
+**Design goal:** Once Item 7 is done, callers (Xetrapal) should only need to know the
+`goat_name` — FalkorDB host/port/graph_name should live in MojoGOAT's own registry
+config, not in the caller's config file. The caller should not need to know or care
+what backend is behind a named goat.

@@ -1,10 +1,19 @@
 import os
 import json
 import re
+import secrets
+import string
 from datetime import datetime
-from uuid import uuid4, uuid5, NAMESPACE_URL
+from uuid import uuid5, NAMESPACE_URL
 
 import aiofiles
+
+_ID_ALPHABET = string.ascii_letters + string.digits  # base-62
+
+
+def _short_id(n: int = 10) -> str:
+    """Return a random *n*-character base-62 string."""
+    return "".join(secrets.choice(_ID_ALPHABET) for _ in range(n))
 
 from .base import GoatBase, REL_IDENTITY
 
@@ -191,8 +200,10 @@ class TextGoat(GoatBase):
         source: str | None = None,
         target: str | None = None,
         story: str | None = None,
+        props: dict | None = None,
+        limit: int | None = None,
     ) -> list[dict]:
-        """Return relationships, optionally filtered by source / target / story."""
+        """Return relationships, optionally filtered by source / target / story / props."""
         relationships = []
         try:
             lines = await self._read_rel_lines()
@@ -205,10 +216,10 @@ class TextGoat(GoatBase):
                 continue
             ts = parts[3] if len(parts) >= 4 else datetime.now().isoformat()
             rel_id = self._rel_id_from_line(line, parts)
-            props: dict = {}
+            extra: dict = {}
             if len(parts) >= 6:
                 try:
-                    props = json.loads(parts[5])
+                    extra = json.loads(parts[5])
                 except (json.JSONDecodeError, ValueError):
                     pass
 
@@ -218,15 +229,26 @@ class TextGoat(GoatBase):
                 "target_id": parts[2],
                 "timestamp": ts,
                 "relationship_id": rel_id,
-                **props,
+                **extra,
             }
 
             if (source is None or reldict["source_id"] == source) and \
                (target is None or reldict["target_id"] == target) and \
                (story is None or reldict["story"] == story):
+                if props and not all(reldict.get(k) == v for k, v in props.items()):
+                    continue
                 relationships.append(reldict)
+                if limit is not None and len(relationships) >= limit:
+                    break
 
         return relationships
+
+    async def get_relationship(self, relationship_id: str) -> dict | None:
+        """Return a single relationship by UUID, or None if not found."""
+        for rel in await self.get_relationships():
+            if rel.get("relationship_id") == relationship_id:
+                return rel
+        return None
 
     async def create_relationship(
         self,
@@ -243,7 +265,7 @@ class TextGoat(GoatBase):
             if not await self.get_node(source) or not await self.get_node(target):
                 return None
 
-            rel_id = str(uuid4())
+            rel_id = f"{self.goatname}:{_short_id()}"
             ts = datetime.now().isoformat()
             line = f"{source}|{story}|{target}|{ts}|{rel_id}"
             if props:

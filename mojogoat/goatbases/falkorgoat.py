@@ -149,6 +149,8 @@ class FalkorGoat(GoatBase):
         source: str | None = None,
         target: str | None = None,
         story: str | None = None,
+        props: dict | None = None,
+        limit: int | None = None,
     ) -> list[dict]:
         """Return ``is_connected_to`` relationships, optionally filtered."""
         conditions: list[str] = []
@@ -163,17 +165,35 @@ class FalkorGoat(GoatBase):
         if story:
             conditions.append("$story IN r.stories")
             params["story"] = story
+        if props:
+            for k, v in props.items():
+                param_name = f"prop_{k}"
+                conditions.append(f"r.{k} = ${param_name}")
+                params[param_name] = v
 
         where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
         query = (
             f"MATCH (n:Node)-[r:{REL_CONNECTED}]->(m:Node){where} "
-            "RETURN n.nodeid, r, m.nodeid"
+            f"RETURN n.nodeid, r, m.nodeid{limit_clause}"
         )
         result = await self._graph.query(query, params)
         return [
             self._rel_to_quad(row[0], row[1], row[2])
             for row in result.result_set
         ]
+
+    async def get_relationship(self, relationship_id: str) -> dict | None:
+        """Return a single relationship by UUID, or None if not found."""
+        result = await self._graph.query(
+            f"MATCH (n:Node)-[r:{REL_CONNECTED} {{relationship_id: $rid}}]->(m:Node) "
+            "RETURN n.nodeid, r, m.nodeid",
+            {"rid": relationship_id},
+        )
+        if not result.result_set:
+            return None
+        row = result.result_set[0]
+        return self._rel_to_quad(row[0], row[1], row[2])
 
     async def create_relationship(
         self,

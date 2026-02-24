@@ -34,7 +34,12 @@ class GoatBase(ABC):
         source: str | None = None,
         target: str | None = None,
         story: str | None = None,
+        props: dict | None = None,
+        limit: int | None = None,
     ) -> list[dict]: ...
+
+    @abstractmethod
+    async def get_relationship(self, relationship_id: str) -> dict | None: ...
 
     @abstractmethod
     async def create_relationship(
@@ -42,7 +47,14 @@ class GoatBase(ABC):
     ) -> dict | None: ...
 
     @abstractmethod
-    async def delete_relationship(self, relationship_id: str) -> bool: ...
+    async def delete_relationship(self, relationship_id: str) -> bool:
+        """Remove a relationship permanently. Returns True if found.
+
+        WARNING: Do not call this in normal application flow. Use update_relationship_props()
+        to mark relationships as invalid via **props (e.g. state='invalidated'). This method
+        exists for administrative correction and test teardown only. See ADR-0008.
+        """
+        ...
 
     @abstractmethod
     async def update_relationship_props(

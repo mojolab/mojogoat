@@ -2,10 +2,6 @@ from flask import request, jsonify
 import json
 from datetime import datetime
 from functools import wraps
-from mojogoat.goatbases.mongogoat.models import sqldb, Relationship, Node
-
-# Module-level active goat reference
-_active_goat = None
 
 
 def init_routes(app):
@@ -14,31 +10,25 @@ def init_routes(app):
 
 
 def set_active_goat_ref(goat):
-    global _active_goat
-    _active_goat = goat
+    """Set the active goat in mojogoatapi. Kept for test-teardown compatibility."""
+    try:
+        import mojogoatapi
+        mojogoatapi.active_goat = goat
+    except (ImportError, AttributeError):
+        pass
 
 
 def get_active_goat():
-    global _active_goat
-    if _active_goat is None:
-        try:
-            from mojogoatapi import active_goat
-            _active_goat = active_goat
-        except (ImportError, AttributeError) as e:
-            print(f"Error getting active goat: {e}")
-    return _active_goat
+    """Return the current active GoatBase instance from mojogoatapi."""
+    try:
+        import mojogoatapi
+        return mojogoatapi.active_goat
+    except (ImportError, AttributeError):
+        return None
 
 
 def check_active_goat():
-    goat = get_active_goat()
-    if not goat:
-        try:
-            from mojogoatapi import active_goat as mojo_active_goat
-            if mojo_active_goat:
-                set_active_goat_ref(mojo_active_goat)
-                return None
-        except Exception:
-            pass
+    if not get_active_goat():
         return jsonify({"error": "No active goat selected"}), 404
     return None
 
@@ -166,13 +156,24 @@ def register_routes(app):
     @requires_active_goat
     async def get_relationship(relationship_id):
         try:
-            rels = await get_active_goat().get_relationships()
-            for rel in rels:
-                if str(rel.get("relationship_id")) == str(relationship_id):
-                    return jsonify(rel), 200
-            return jsonify({"error": f"Relationship '{relationship_id}' not found"}), 404
+            rel = await get_active_goat().get_relationship(relationship_id)
+            if rel is None:
+                return jsonify({"error": f"Relationship '{relationship_id}' not found"}), 404
+            return jsonify(rel), 200
         except Exception as e:
             return jsonify({"error": f"Failed to get relationship: {str(e)}"}), 500
+
+    @app.route('/api/relationships/<relationship_id>', methods=['PATCH'])
+    @requires_active_goat
+    async def update_relationship(relationship_id):
+        data = request.json or {}
+        try:
+            ok = await get_active_goat().update_relationship_props(relationship_id, **data)
+            if not ok:
+                return jsonify({"error": f"Relationship '{relationship_id}' not found"}), 404
+            return jsonify({"message": "Updated", "relationship_id": relationship_id}), 200
+        except Exception as e:
+            return jsonify({"error": f"Failed to update relationship: {str(e)}"}), 500
 
     @app.route('/api/relationships/<relationship_id>', methods=['DELETE'])
     @requires_active_goat

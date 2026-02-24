@@ -9,13 +9,11 @@ MojoGOAT API - A Graph of All Things API
 # TODO: #7 ARCHITECTURE - Read object schemas from a schema file
 # TODO: #8 ARCHITECTURE - Use appropriate stores for appropriate data - line records for relationships and doc records on entities
 
+import asyncio
 import io, os, re, sys
 import json
 from datetime import datetime
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_mongoengine import MongoEngine
 from flask_cors import CORS, cross_origin
 
 # Create Flask app
@@ -25,15 +23,118 @@ CORS(app)
 # Default registry location
 DEFAULT_REGISTRY_PATH = os.environ.get('MOJOGOAT_REGISTRY', '/xpal-data/conf/goat_registry.json')
 
+# Default data directory for the text backend fallback
+DEFAULT_DATA_DIR = os.environ.get('MOJOGOAT_DATA', '/xpal-data/goats')
+
+# Map class names to canonical backend type strings
+_BACKEND_TYPE_MAP = {
+    'FalkorGoat': 'falkordb',
+    'TextGoat':   'text',
+    'MemoryGoat': 'memory',
+    'Neo4jGoat':  'neo4j',
+}
+
+
+def _get_backend_type(goat) -> str:
+    return _BACKEND_TYPE_MAP.get(type(goat).__name__, 'unknown')
+
+
+# ---------------------------------------------------------------------------
+# Backend probing helpers
+# ---------------------------------------------------------------------------
+
+async def _probe_falkordb(config: dict):
+    """Try to connect to FalkorDB. Returns a FalkorGoat on success, None on failure."""
+    try:
+        from mojogoat.goatbases.falkorgoat import FalkorGoat
+        goat = FalkorGoat(
+            host=config.get('host', 'localhost'),
+            port=int(config.get('port', 6379)),
+            graph_name=config.get('graph_name', 'mojogoat'),
+            password=config.get('password'),
+        )
+        await asyncio.wait_for(goat.get_nodes(), timeout=2.0)
+        return goat
+    except Exception:
+        return None
+
+
+async def _probe_neo4j(config: dict):
+    """Try to connect to Neo4j. Returns a Neo4jGoat on success, None on failure."""
+    try:
+        from mojogoat.goatbases.neo4jgoat import Neo4jGoat
+        goat = Neo4jGoat(config['config_path'])
+        await asyncio.wait_for(goat.get_nodes(), timeout=2.0)
+        return goat
+    except Exception:
+        return None
+
+
+def _make_textgoat(config: dict):
+    """Instantiate a TextGoat, creating the data directory if needed."""
+    from mojogoat.goatbases.textgoat import TextGoat
+    goat_path = config.get('goat_path', os.path.join(DEFAULT_DATA_DIR, 'textgoat'))
+    goat_name = config.get('goat_name', 'default')
+    return TextGoat({'goatpath': goat_path, 'goatname': goat_name})
+
+
+def _make_memorygoat():
+    from mojogoat.goatbases.memorygoat import MemoryGoat
+    return MemoryGoat()
+
+
+async def _select_backend(requested_type: str, config: dict):
+    """Instantiate and probe *requested_type*. Returns (goat, type_name).
+
+    If *requested_type* is ``"auto"``, tries falkordb → text → memory in order.
+    Raises ValueError for unsupported types or unavailable explicit backends.
+    """
+    if requested_type == 'falkordb':
+        goat = await _probe_falkordb(config)
+        if goat is None:
+            raise ValueError('FalkorDB is not reachable')
+        return goat, 'falkordb'
+
+    if requested_type == 'neo4j':
+        if not config.get('config_path'):
+            raise ValueError('neo4j backend requires config_path')
+        goat = await _probe_neo4j(config)
+        if goat is None:
+            raise ValueError('Neo4j is not reachable')
+        return goat, 'neo4j'
+
+    if requested_type == 'text':
+        return _make_textgoat(config), 'text'
+
+    if requested_type == 'memory':
+        return _make_memorygoat(), 'memory'
+
+    if requested_type == 'auto':
+        goat = await _probe_falkordb(config)
+        if goat:
+            return goat, 'falkordb'
+        try:
+            goat = _make_textgoat(config)
+            return goat, 'text'
+        except Exception:
+            pass
+        return _make_memorygoat(), 'memory'
+
+    raise ValueError(f"Unknown backend type '{requested_type}'. "
+                     "Valid options: auto, falkordb, neo4j, text, memory")
+
+
+def _activate(goat, type_name: str) -> None:
+    """Set *goat* as the process-wide active goat."""
+    global active_goat, active_goat_name
+    active_goat = goat
+    active_goat_name = f'backend:{type_name}'
+
 # Global variables for registry (need to be declared before they're used)
 active_goat = None
 active_goat_name = None
 registry_path = None 
 registry = {}
-
-# Initialize database connections
-sqldb = SQLAlchemy()
-mongodb = MongoEngine()
 
 def initialize_app(registry_file=None):
     """Initialize the application with the registry file"""
@@ -105,41 +206,26 @@ def set_active_goat(goat_name):
             from mojogoat.goatbases.textgoat import TextGoat
             active_goat = TextGoat(goat_config)
             success = True
+        elif goat_type == "falkordb":
+            from mojogoat.goatbases.falkorgoat import FalkorGoat
+            active_goat = FalkorGoat(
+                host=goat_config.get("host", "localhost"),
+                port=int(goat_config.get("port", 6379)),
+                graph_name=goat_config.get("graph_name", "mojogoat"),
+                password=goat_config.get("password"),
+            )
+            success = True
+        elif goat_type == "memory":
+            from mojogoat.goatbases.memorygoat import MemoryGoat
+            active_goat = MemoryGoat()
+            success = True
         elif goat_type == "neo4j":
             try:
-                # Try to import from both neo4j goat implementations
                 from mojogoat.goatbases.neo4jgoat import Neo4jGoat
-                    
                 active_goat = Neo4jGoat(goat_config.get("config_path"))
                 success = True
             except ImportError:
                 app.logger.error("Failed to import Neo4jGoat")
-        elif goat_type == "mongopg":
-            # Configure the app for MongoDB and PostgreSQL
-            app.config['SQLALCHEMY_DATABASE_URI'] = goat_config.get("postgres_uri", "postgresql://postgres:postgres@localhost:5432/xetrapal")
-            app.config['MONGODB_SETTINGS'] = {
-                'host': goat_config.get("mongodb_uri", f"mongodb://localhost/{goat_name}")
-            }
-            
-            # For testing purposes, use a special approach
-            # This avoids 'AssertionError: The setup method ... can no longer be called'
-            if app.config.get('TESTING', False):
-                # For test environment, create a simple MongoDBPostgresGoat-like object
-                from mojogoat.goatbases.mongogoat.models import MongoDBPostgresGoat
-                active_goat = MongoDBPostgresGoat(goat_config)
-                success = True
-            else:
-                # Initialize database connections for production
-                try:
-                    sqldb.init_app(app)
-                    mongodb.init_app(app)
-                    
-                    # Create a MongoDB+PostgreSQL goat handler
-                    from mojogoat.goatbases.mongogoat.models import MongoDBPostgresGoat
-                    active_goat = MongoDBPostgresGoat(goat_config)
-                    success = True
-                except Exception as e:
-                    app.logger.error(f"Failed to initialize database connections: {str(e)}")
         else:
             app.logger.error(f"Unsupported goat type: {goat_type}")
     except Exception as e:
@@ -147,15 +233,7 @@ def set_active_goat(goat_name):
     
     if success:
         active_goat_name = goat_name
-        
-        # Update the active goat reference in routes
-        try:
-            from mojogoat.routes import set_active_goat_ref
-            set_active_goat_ref(active_goat)
-            app.logger.info(f"Set active goat reference for routes: {goat_name}")
-        except Exception as e:
-            app.logger.error(f"Failed to update routes with active goat: {str(e)}")
-    
+
     return success
 
 # API Routes
@@ -192,30 +270,32 @@ def create_goat():
     }
     
     # Add type-specific configuration
-    if data.get("type") == "text":
-        if not data.get("goat_path"):
-            return jsonify({"error": "Missing required field: goat_path for text goat"}), 400
-        goat_config["goatpath"] = data.get("goat_path")
-        goat_config["goatname"] = data.get("name")
-        
-    elif data.get("type") == "neo4j":
+    goat_type = data.get("type")
+    if goat_type == "text":
+        goat_name = data.get("name")
+        # Auto-derive data directory as DEFAULT_DATA_DIR/{name} if not explicitly supplied
+        goat_path = data.get("goat_path") or os.path.join(DEFAULT_DATA_DIR, goat_name)
+        goat_config["goatpath"] = goat_path
+        goat_config["goatname"] = goat_name
+
+    elif goat_type == "falkordb":
+        goat_config["host"] = data.get("host", "localhost")
+        goat_config["port"] = int(data.get("port", 6379))
+        goat_config["graph_name"] = data.get("graph_name") or data.get("name")
+        if data.get("password"):
+            goat_config["password"] = data.get("password")
+
+    elif goat_type == "memory":
+        pass  # No additional storage config required
+
+    elif goat_type == "neo4j":
         if not data.get("config_path"):
             return jsonify({"error": "Missing required field: config_path for neo4j goat"}), 400
         goat_config["config_path"] = data.get("config_path")
-        
-    elif data.get("type") == "mongopg":
-        goat_config["mongodb_uri"] = data.get("mongodb_uri", f"mongodb://localhost/{data.get('name')}")
-        goat_config["postgres_uri"] = data.get("postgres_uri", "postgresql://postgres:postgres@localhost:5432/xetrapal")
-        
-        # Initialize databases if needed
-        try:
-            if data.get("create_db", False):
-                # We would need to create the MongoDB database and PostgreSQL tables
-                pass  # Implemented during initialization
-        except Exception as e:
-            return jsonify({"error": f"Failed to create databases: {str(e)}"}), 500
+
     else:
-        return jsonify({"error": f"Unsupported goat type: {data.get('type')}"}), 400
+        return jsonify({"error": f"Unsupported goat type: {data.get('type')}. "
+                                  "Valid types: text, falkordb, memory, neo4j"}), 400
     
     # Add to registry
     registry.setdefault("goats", []).append(goat_config)
@@ -392,13 +472,144 @@ def debug_info():
         }
     }), 200
 
+# ---------------------------------------------------------------------------
+# Status / self-test
+# ---------------------------------------------------------------------------
+
+@app.route('/api/status', methods=['GET'])
+def get_status():
+    """API self-test — returns config, goat list, backend availability, and operation index."""
+    import importlib.util
+
+    def _can_import(module_name: str) -> bool:
+        return importlib.util.find_spec(module_name) is not None
+
+    backends = {
+        "text":     {"available": True,                    "description": "File-based flat-file backend"},
+        "memory":   {"available": True,                    "description": "In-memory backend (no persistence, resets on restart)"},
+        "falkordb": {"available": _can_import("falkordb"), "description": "FalkorDB graph database (requires running FalkorDB/Redis)"},
+        "neo4j":    {"available": _can_import("neo4j"),    "description": "Neo4j graph database"},
+    }
+
+    active_info = None
+    if active_goat:
+        goat_cfg = next(
+            (g for g in registry.get("goats", []) if g.get("name") == active_goat_name),
+            None,
+        )
+        active_info = {
+            "name": active_goat_name,
+            "type": _get_backend_type(active_goat),
+            "class": type(active_goat).__name__,
+        }
+        if goat_cfg:
+            for key in ("goatpath", "host", "port", "graph_name"):
+                if key in goat_cfg:
+                    active_info[key] = goat_cfg[key]
+
+    goats = [
+        {
+            "name": g.get("name"),
+            "type": g.get("type"),
+            "is_default": registry.get("default") == g.get("name"),
+            "is_active": active_goat_name == g.get("name"),
+            **{k: v for k, v in g.items() if k not in ("name", "type", "description", "created")},
+        }
+        for g in registry.get("goats", [])
+    ]
+
+    operations = [
+        {"method": "GET",    "path": "/api/status",                         "description": "API self-test (this endpoint)"},
+        {"method": "GET",    "path": "/api/goats",                          "description": "List all registered goats"},
+        {"method": "POST",   "path": "/api/goats",                          "description": "Create a new goat (type: text|falkordb|memory|neo4j)"},
+        {"method": "GET",    "path": "/api/active-goat",                    "description": "Get the currently active goat"},
+        {"method": "POST",   "path": "/api/active-goat",                    "description": "Switch the active goat by name"},
+        {"method": "GET",    "path": "/api/backend",                        "description": "Get current backend type"},
+        {"method": "POST",   "path": "/api/backend",                        "description": "Switch backend (type: auto|text|memory|falkordb|neo4j)"},
+        {"method": "GET",    "path": "/api/nodes",                          "description": "List all nodes"},
+        {"method": "POST",   "path": "/api/nodes",                          "description": "Create or update a node (body: {nodeid, ...props})"},
+        {"method": "GET",    "path": "/api/nodes/<nodeid>",                 "description": "Get a node by ID"},
+        {"method": "PUT",    "path": "/api/nodes/<nodeid>",                 "description": "Update a node"},
+        {"method": "DELETE", "path": "/api/nodes/<nodeid>",                 "description": "Delete a node"},
+        {"method": "GET",    "path": "/api/nodes/label/<label>",            "description": "List nodes by label"},
+        {"method": "GET",    "path": "/api/relationships",                  "description": "List relationships (query params: source, target, story)"},
+        {"method": "POST",   "path": "/api/relationships",                  "description": "Create a relationship (body: {source, target, story, ...props})"},
+        {"method": "GET",    "path": "/api/relationships/<id>",             "description": "Get a relationship by ID"},
+        {"method": "PATCH",  "path": "/api/relationships/<id>",             "description": "Update relationship properties (body: {...props})"},
+        {"method": "DELETE", "path": "/api/relationships/<id>",             "description": "Delete a relationship"},
+        {"method": "GET",    "path": "/api/active-goat/composition",        "description": "Node count grouped by label"},
+        {"method": "GET",    "path": "/api/active-goat/taxonomy",           "description": "Relationship count grouped by story"},
+        {"method": "POST",   "path": "/api/active-goat/dump-relationships", "description": "Dump all relationships to a file (body: {filename})"},
+    ]
+
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "config": {
+            "registry_path": registry_path,
+            "default_data_dir": DEFAULT_DATA_DIR,
+        },
+        "active_goat": active_info,
+        "goats": goats,
+        "backends": backends,
+        "operations": operations,
+    }), 200
+
+
+# ---------------------------------------------------------------------------
+# Backend selection API
+# ---------------------------------------------------------------------------
+
+@app.route('/api/backend', methods=['GET'])
+def get_backend():
+    """Return the currently active backend type and class name."""
+    if not active_goat:
+        return jsonify({'type': None, 'class': None}), 200
+    return jsonify({
+        'type': _get_backend_type(active_goat),
+        'class': type(active_goat).__name__,
+    }), 200
+
+
+@app.route('/api/backend', methods=['POST'])
+async def set_backend():
+    """Select the active backend store.
+
+    Request body (all fields optional):
+      type        — "auto" | "falkordb" | "neo4j" | "text" | "memory"  (default: "auto")
+      host        — FalkorDB / Neo4j host             (default: localhost)
+      port        — FalkorDB port                     (default: 6379)
+      graph_name  — FalkorDB graph name               (default: mojogoat)
+      password    — FalkorDB password
+      config_path — Neo4j JSON config file path       (required for neo4j)
+      goat_path   — Text backend data directory
+      goat_name   — Text backend name                 (default: default)
+
+    Auto mode tries falkordb → text → memory and uses the first available.
+    """
+    data = request.json or {}
+    requested_type = data.get('type', 'auto')
+
+    try:
+        goat, actual_type = await _select_backend(requested_type, data)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'Failed to initialise backend: {exc}'}), 500
+
+    _activate(goat, actual_type)
+    app.logger.info(f"Backend set to {actual_type} (requested: {requested_type})")
+
+    return jsonify({
+        'type': actual_type,
+        'class': type(goat).__name__,
+        'requested': requested_type,
+    }), 200
+
+
 # Import and initialize routes for CRUD operations
-from mojogoat.routes import init_routes, set_active_goat_ref
+from mojogoat.routes import init_routes
 
-# Set the active goat reference for routes
-set_active_goat_ref(active_goat)
-
-# Initialize routes
 init_routes(app)
 
 # Initialize the app with command line arguments if provided
@@ -424,7 +635,19 @@ if __name__ == '__main__':
     
     # Initialize the app
     initialize_app()
-    
+
+    # Auto-detect backend if registry didn't provide one
+    if active_goat is None:
+        loop = asyncio.new_event_loop()
+        try:
+            goat, goat_type = loop.run_until_complete(_select_backend('auto', {}))
+            _activate(goat, goat_type)
+            print(f" * Auto-selected backend: {goat_type}")
+        except Exception as exc:
+            print(f" * Backend auto-detection failed: {exc}")
+        finally:
+            loop.close()
+
     # Run the app
     app.run(debug=args.debug, host=args.host, port=args.port)
 else:

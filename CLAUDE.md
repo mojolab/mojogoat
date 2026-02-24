@@ -87,11 +87,14 @@ source | story | target | timestamp | relationship_id | **props
 ```
 
 Rules:
-- `relationship_id` is always a UUID v4 string generated at write time — never an integer
+- `relationship_id` is an opaque string generated at write time — treat as opaque, never parse it
+  - TextGoat generates `{goatname}:{10char_base62}` (e.g. `xetrapal:Kj8mNpQr4t`) — see ADR-0006
+  - FalkorGoat/Neo4jGoat/MemoryGoat generate UUID v4 strings — see ADR-0002
 - `timestamp` is always an ISO-8601 string — never a Python `datetime` object
 - `story` is whatever the caller passes — MojoGOAT is domain-agnostic, never validate it
 - `**props` are stored and returned as-is — MojoGOAT does not interpret them
-- Never delete relationships — callers manage their own invalidation via `**props`
+- Application flow must never call `delete_relationship` — use `**props` for invalidation
+  (e.g. `smriti_state="invalidated"`). `delete_relationship` exists for admin/test use only — see ADR-0008
 
 ### Cypher relationship model (for FalkorGoat and Neo4jGoat)
 

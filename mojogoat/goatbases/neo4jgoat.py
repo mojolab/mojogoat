@@ -115,6 +115,8 @@ class Neo4jGoat(GoatBase):
         source: str | None = None,
         target: str | None = None,
         story: str | None = None,
+        props: dict | None = None,
+        limit: int | None = None,
     ) -> list[dict]:
         """Return relationships, optionally filtered."""
         conditions = []
@@ -128,12 +130,18 @@ class Neo4jGoat(GoatBase):
         if story:
             conditions.append("$story IN r.stories")
             params['story'] = story
+        if props:
+            for k, v in props.items():
+                param_name = f"prop_{k}"
+                conditions.append(f"r.{k} = ${param_name}")
+                params[param_name] = v
 
         where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
         query = (
             f"MATCH (n)-[r:{REL_CONNECTED}]->(m){where_clause} "
             "RETURN n.nodeid AS src, r.stories AS stories, m.nodeid AS tgt, "
-            "r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props"
+            f"r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props{limit_clause}"
         )
 
         rels = []
@@ -154,6 +162,32 @@ class Neo4jGoat(GoatBase):
                     **extra,
                 })
         return rels
+
+    async def get_relationship(self, relationship_id: str) -> dict | None:
+        """Return a single relationship by UUID, or None if not found."""
+        async with self.driver.session() as session:
+            result = await session.run(
+                f"MATCH (n)-[r:{REL_CONNECTED} {{relationship_id: $rid}}]->(m) "
+                "RETURN n.nodeid AS src, r.stories AS stories, m.nodeid AS tgt, "
+                "r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props",
+                rid=relationship_id,
+            )
+            record = await result.single()
+            if not record:
+                return None
+            stories = record["stories"] or []
+            extra = {
+                k: v for k, v in (record["props"] or {}).items()
+                if k not in ("stories", "timestamp", "relationship_id")
+            }
+            return {
+                "source_id": record["src"],
+                "story": stories[0] if stories else "",
+                "target_id": record["tgt"],
+                "timestamp": record["ts"],
+                "relationship_id": record["rid"],
+                **extra,
+            }
 
     async def create_relationship(
         self,

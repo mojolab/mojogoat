@@ -40,7 +40,11 @@ class MojoGoatAPITestCase(unittest.TestCase):
         import mojogoatapi
         mojogoatapi.active_goat = None
         mojogoatapi.active_goat_name = None
-        
+
+        # Also reset the routes module-level reference so no state leaks between tests
+        from mojogoat.routes import set_active_goat_ref
+        set_active_goat_ref(None)
+
         initialize_app(self.registry_file)
         
         self.client = app.test_client()
@@ -84,29 +88,6 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(len(data.get('goats', [])), 1)
         self.assertEqual(data.get('default'), "test_text_goat")
         self.assertEqual(data.get('active'), "test_text_goat")
-    
-    def test_create_mongopg_goat(self):
-        """Test creating a MongoDB+PostgreSQL goat"""
-        data = {
-            "name": "test_mongopg_goat",
-            "type": "mongopg",
-            "mongodb_uri": "mongodb://localhost/test_mongopg_goat",
-            "postgres_uri": "sqlite:///test_relationships.db",
-            "make_default": True,
-            "make_active": True
-        }
-        
-        response = self.client.post('/api/goats', json=data)
-        self.assertEqual(response.status_code, 201)
-        
-        # Check that the goat was added to the registry
-        response = self.client.get('/api/goats')
-        self.assertEqual(response.status_code, 200)
-        
-        data = json.loads(response.data)
-        self.assertEqual(len(data.get('goats', [])), 1)
-        self.assertEqual(data.get('default'), "test_mongopg_goat")
-        self.assertEqual(data.get('active'), "test_mongopg_goat")
     
     def test_create_neo4j_goat(self):
         """Test creating a Neo4j goat"""
@@ -232,13 +213,10 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('error'), "Missing required fields: name and type")
         
-        # Test missing goat_path for text goat
-        response = self.client.post('/api/goats', json={"name": "test_goat", "type": "text"})
-        self.assertEqual(response.status_code, 400)
-        
-        data = json.loads(response.data)
-        self.assertEqual(data.get('error'), "Missing required field: goat_path for text goat")
-        
+        # Text goat with no explicit goat_path is valid — path is auto-derived from name
+        response = self.client.post('/api/goats', json={"name": "test_goat_auto", "type": "text"})
+        self.assertEqual(response.status_code, 201)
+
         # Test missing config_path for neo4j goat
         response = self.client.post('/api/goats', json={"name": "test_goat", "type": "neo4j"})
         self.assertEqual(response.status_code, 400)
