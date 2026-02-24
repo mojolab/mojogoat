@@ -6,8 +6,10 @@ from uuid import uuid4, uuid5, NAMESPACE_URL
 
 import aiofiles
 
+from .base import GoatBase, REL_IDENTITY
 
-class TextGoat:
+
+class TextGoat(GoatBase):
     def __init__(self, goatconfig):
         self.config = goatconfig
         self.goatpath = goatconfig['goatpath']
@@ -72,34 +74,9 @@ class TextGoat:
     # Node CRUD
     # ------------------------------------------------------------------
 
-    async def add_node(self, nodeid: str | None = None, **kwargs) -> dict:
-        """Create or update a node.
-
-        Accepts ``add_node(nodeid, **props)`` or a dict/JSON string as the
-        sole positional argument (legacy calling conventions are preserved).
-        """
-        node_data: dict = {}
-
-        if nodeid is None:
-            raise ValueError("No nodeid provided")
-
-        # Support single-dict or single-JSON-string argument (legacy)
-        if isinstance(nodeid, dict):
-            node_data = nodeid.copy()
-            nodeid = node_data.pop("nodeid", None)
-            if nodeid is None:
-                raise ValueError("Dictionary node data must include 'nodeid'")
-        elif isinstance(nodeid, str) and nodeid.startswith('{'):
-            try:
-                node_data = json.loads(nodeid)
-                nodeid = node_data.pop("nodeid", None)
-                if nodeid is None:
-                    raise ValueError("JSON node data must include 'nodeid'")
-            except json.JSONDecodeError:
-                node_data = kwargs.copy()
-        else:
-            node_data = kwargs.copy()
-
+    async def add_node(self, nodeid: str, **kwargs) -> dict:
+        """Create or update a node."""
+        node_data = kwargs.copy()
         node_data['nodeid'] = nodeid
 
         # Normalise labels
@@ -373,6 +350,11 @@ class TextGoat:
         async with aiofiles.open(filename, "w") as f:
             await f.write("\n".join(lines))
         return len(rels)
+
+    async def link_is(self, node1_id: str, node2_id: str) -> None:
+        """Create bidirectional is_the_same_as relationships between two nodes."""
+        await self.create_relationship(node1_id, node2_id, REL_IDENTITY)
+        await self.create_relationship(node2_id, node1_id, REL_IDENTITY)
 
     # ------------------------------------------------------------------
     # Legacy / feed interface (kept sync — not part of async migration)

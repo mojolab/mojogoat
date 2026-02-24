@@ -108,10 +108,7 @@ def set_active_goat(goat_name):
         elif goat_type == "neo4j":
             try:
                 # Try to import from both neo4j goat implementations
-                try:
-                    from mojogoat.goatbases.newneo4jgoatcopilot import Neo4jGoat
-                except ImportError:
-                    from mojogoat.goatbases.neo4jgoat import Neo4jGoat
+                from mojogoat.goatbases.neo4jgoat import Neo4jGoat
                     
                 active_goat = Neo4jGoat(goat_config.get("config_path"))
                 success = True

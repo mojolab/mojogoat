@@ -6,12 +6,10 @@ try:
 except ImportError:
     AsyncFalkorDB = None  # type: ignore[assignment,misc]
 
-# Internal relationship type constants — two types only, per the quad model.
-_REL_CONNECTED = "is_connected_to"
-_REL_IDENTITY = "is_the_same_as"
+from .base import GoatBase, REL_CONNECTED, REL_IDENTITY
 
 
-class FalkorGoat:
+class FalkorGoat(GoatBase):
     """Async FalkorDB backend (Redis-based graph, Cypher query language).
 
     Relationship model
@@ -50,6 +48,13 @@ class FalkorGoat:
         obj = cls.__new__(cls)
         obj._graph = graph
         return obj
+
+    async def close(self) -> None:
+        """Close the underlying FalkorDB connection (no-op if already closed)."""
+        try:
+            await self._graph.connection.aclose()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -161,7 +166,7 @@ class FalkorGoat:
 
         where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
         query = (
-            f"MATCH (n:Node)-[r:{_REL_CONNECTED}]->(m:Node){where} "
+            f"MATCH (n:Node)-[r:{REL_CONNECTED}]->(m:Node){where} "
             "RETURN n.nodeid, r, m.nodeid"
         )
         result = await self._graph.query(query, params)
@@ -193,7 +198,7 @@ class FalkorGoat:
         }
         result = await self._graph.query(
             f"MATCH (n:Node {{nodeid: $src}}), (m:Node {{nodeid: $tgt}}) "
-            f"CREATE (n)-[r:{_REL_CONNECTED}]->(m) SET r += $props "
+            f"CREATE (n)-[r:{REL_CONNECTED}]->(m) SET r += $props "
             "RETURN r",
             {"src": source, "tgt": target, "props": rel_props},
         )
@@ -211,7 +216,7 @@ class FalkorGoat:
     async def delete_relationship(self, relationship_id: str) -> bool:
         """Delete an ``is_connected_to`` relationship by UUID. Returns True if found."""
         result = await self._graph.query(
-            f"MATCH ()-[r:{_REL_CONNECTED} {{relationship_id: $rid}}]->() "
+            f"MATCH ()-[r:{REL_CONNECTED} {{relationship_id: $rid}}]->() "
             "DELETE r RETURN count(r) AS cnt",
             {"rid": relationship_id},
         )
@@ -226,7 +231,7 @@ class FalkorGoat:
         changed — only the extra properties are updated.
         """
         result = await self._graph.query(
-            f"MATCH ()-[r:{_REL_CONNECTED} {{relationship_id: $rid}}]->() "
+            f"MATCH ()-[r:{REL_CONNECTED} {{relationship_id: $rid}}]->() "
             "SET r += $props RETURN count(r) AS cnt",
             {"rid": relationship_id, "props": props},
         )
@@ -250,7 +255,7 @@ class FalkorGoat:
     async def get_taxonomy(self) -> dict[str, int]:
         """Return relationship counts grouped by story."""
         result = await self._graph.query(
-            f"MATCH ()-[r:{_REL_CONNECTED}]->() "
+            f"MATCH ()-[r:{REL_CONNECTED}]->() "
             "UNWIND r.stories AS story "
             "RETURN story, count(story) AS cnt"
         )
@@ -279,7 +284,7 @@ class FalkorGoat:
         """Create bidirectional ``is_the_same_as`` relationships."""
         await self._graph.query(
             f"MATCH (n1:Node {{nodeid: $n1}}), (n2:Node {{nodeid: $n2}}) "
-            f"MERGE (n1)-[:{_REL_IDENTITY}]->(n2) "
-            f"MERGE (n2)-[:{_REL_IDENTITY}]->(n1)",
+            f"MERGE (n1)-[:{REL_IDENTITY}]->(n2) "
+            f"MERGE (n2)-[:{REL_IDENTITY}]->(n1)",
             {"n1": node1_id, "n2": node2_id},
         )
