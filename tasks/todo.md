@@ -108,3 +108,53 @@ Xetrapal integration test: `tests/integration/test_mojogoat_api.py::test_item7_f
 `goat_name` — FalkorDB host/port/graph_name should live in MojoGOAT's own registry
 config, not in the caller's config file. The caller should not need to know or care
 what backend is behind a named goat.
+
+---
+
+## Item 8 — Add `GET /health` endpoint
+
+**Found during:** Xetrapal ADR 018 (management REPL), 2026-02-24.
+
+`ManagementClient.ping()` currently uses `GET /api/goats` as a proxy for liveness, which
+is fragile — it returns 500 on DB error even if the server is up. A dedicated health
+endpoint is needed.
+
+**Required addition to `mojogoatapi.py`:**
+```python
+@app.route('/health', methods=['GET'])
+def health():
+    """Liveness check — returns 200 if the server is running."""
+    return jsonify({
+        "status": "ok",
+        "goat_count": len(goats),         # number of registered goats
+        "active_goat": active_goat.name if active_goat else None,
+    })
+```
+
+**Xetrapal usage:** `ManagementClient.ping()` should switch to `GET /health` once this
+lands. Until then it falls back to `GET /api/goats`.
+
+Tests: `GET /health → {"status": "ok"}` with status 200.
+
+---
+
+## Item 9 — Verify/add `?target=<uri>` filter in `GET /api/relationships`
+
+**Found during:** Xetrapal ADR 018 (management REPL — "list jeevas"), 2026-02-24.
+
+Xetrapal needs to query: "give me all Smritis where target is `type:jeeva` and story is
+`is a`" to list all registered Jeevas without client-side filtering.
+
+**Required test:**
+```
+GET /api/relationships?target=type:jeeva&story=is+a&smriti_state=confirmed
+```
+
+If the `target` filter is not yet supported in `get_relationships()`, add it alongside
+the existing `source` filter (Item 4 added `source` and `story` filters).
+
+**Xetrapal workaround** (until this lands): `ManagementClient` fetches all relationships
+with `story=is+a&smriti_state=confirmed` and filters `target == "type:jeeva"` in Python.
+This is acceptable for small registries but will not scale.
+
+Tests: add `test_filter_by_target` to test_textgoat_async.py and test_falkorgoat_async.py.
