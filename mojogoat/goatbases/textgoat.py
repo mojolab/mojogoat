@@ -1,13 +1,24 @@
 import os
 import json
 import re
+import secrets
+import string
 from datetime import datetime
-from uuid import uuid4, uuid5, NAMESPACE_URL
+from uuid import uuid5, NAMESPACE_URL
 
 import aiofiles
 
+_ID_ALPHABET = string.ascii_letters + string.digits  # base-62
 
-class TextGoat:
+
+def _short_id(n: int = 10) -> str:
+    """Return a random *n*-character base-62 string."""
+    return "".join(secrets.choice(_ID_ALPHABET) for _ in range(n))
+
+from .base import GoatBase, REL_IDENTITY
+
+
+class TextGoat(GoatBase):
     def __init__(self, goatconfig):
         self.config = goatconfig
         self.goatpath = goatconfig['goatpath']
@@ -72,34 +83,9 @@ class TextGoat:
     # Node CRUD
     # ------------------------------------------------------------------
 
-    async def add_node(self, nodeid: str | None = None, **kwargs) -> dict:
-        """Create or update a node.
-
-        Accepts ``add_node(nodeid, **props)`` or a dict/JSON string as the
-        sole positional argument (legacy calling conventions are preserved).
-        """
-        node_data: dict = {}
-
-        if nodeid is None:
-            raise ValueError("No nodeid provided")
-
-        # Support single-dict or single-JSON-string argument (legacy)
-        if isinstance(nodeid, dict):
-            node_data = nodeid.copy()
-            nodeid = node_data.pop("nodeid", None)
-            if nodeid is None:
-                raise ValueError("Dictionary node data must include 'nodeid'")
-        elif isinstance(nodeid, str) and nodeid.startswith('{'):
-            try:
-                node_data = json.loads(nodeid)
-                nodeid = node_data.pop("nodeid", None)
-                if nodeid is None:
-                    raise ValueError("JSON node data must include 'nodeid'")
-            except json.JSONDecodeError:
-                node_data = kwargs.copy()
-        else:
-            node_data = kwargs.copy()
-
+    async def add_node(self, nodeid: str, **kwargs) -> dict:
+        """Create or update a node."""
+        node_data = kwargs.copy()
         node_data['nodeid'] = nodeid
 
         # Normalise labels
@@ -214,8 +200,10 @@ class TextGoat:
         source: str | None = None,
         target: str | None = None,
         story: str | None = None,
+        props: dict | None = None,
+        limit: int | None = None,
     ) -> list[dict]:
-        """Return relationships, optionally filtered by source / target / story."""
+        """Return relationships, optionally filtered by source / target / story / props."""
         relationships = []
         try:
             lines = await self._read_rel_lines()
@@ -228,10 +216,10 @@ class TextGoat:
                 continue
             ts = parts[3] if len(parts) >= 4 else datetime.now().isoformat()
             rel_id = self._rel_id_from_line(line, parts)
-            props: dict = {}
+            extra: dict = {}
             if len(parts) >= 6:
                 try:
-                    props = json.loads(parts[5])
+                    extra = json.loads(parts[5])
                 except (json.JSONDecodeError, ValueError):
                     pass
 
@@ -241,15 +229,26 @@ class TextGoat:
                 "target_id": parts[2],
                 "timestamp": ts,
                 "relationship_id": rel_id,
-                **props,
+                **extra,
             }
 
             if (source is None or reldict["source_id"] == source) and \
                (target is None or reldict["target_id"] == target) and \
                (story is None or reldict["story"] == story):
+                if props and not all(reldict.get(k) == v for k, v in props.items()):
+                    continue
                 relationships.append(reldict)
+                if limit is not None and len(relationships) >= limit:
+                    break
 
         return relationships
+
+    async def get_relationship(self, relationship_id: str) -> dict | None:
+        """Return a single relationship by UUID, or None if not found."""
+        for rel in await self.get_relationships():
+            if rel.get("relationship_id") == relationship_id:
+                return rel
+        return None
 
     async def create_relationship(
         self,
@@ -266,7 +265,7 @@ class TextGoat:
             if not await self.get_node(source) or not await self.get_node(target):
                 return None
 
-            rel_id = str(uuid4())
+            rel_id = f"{self.goatname}:{_short_id()}"
             ts = datetime.now().isoformat()
             line = f"{source}|{story}|{target}|{ts}|{rel_id}"
             if props:
@@ -373,6 +372,11 @@ class TextGoat:
         async with aiofiles.open(filename, "w") as f:
             await f.write("\n".join(lines))
         return len(rels)
+
+    async def link_is(self, node1_id: str, node2_id: str) -> None:
+        """Create bidirectional is_the_same_as relationships between two nodes."""
+        await self.create_relationship(node1_id, node2_id, REL_IDENTITY)
+        await self.create_relationship(node2_id, node1_id, REL_IDENTITY)
 
     # ------------------------------------------------------------------
     # Legacy / feed interface (kept sync — not part of async migration)

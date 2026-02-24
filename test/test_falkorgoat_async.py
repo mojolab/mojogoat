@@ -371,6 +371,76 @@ async def test_dump_all_rels(goat, mock_graph, tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# get_relationship — unit tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_relationship_found(goat, mock_graph):
+    edge_props = {
+        "stories": ["KNOWS"],
+        "timestamp": "2026-02-23T10:00:00",
+        "relationship_id": "target-uuid",
+        "state": "active",
+    }
+    mock_graph.query.return_value = make_result(
+        ["alice", make_edge(edge_props), "bob"]
+    )
+    rel = await goat.get_relationship("target-uuid")
+    assert rel is not None
+    assert rel["relationship_id"] == "target-uuid"
+    assert rel["source_id"] == "alice"
+    assert rel["target_id"] == "bob"
+    assert rel["story"] == "KNOWS"
+    assert rel["state"] == "active"
+    params = mock_graph.query.call_args[0][1]
+    assert params["rid"] == "target-uuid"
+    cypher = mock_graph.query.call_args[0][0]
+    assert "relationship_id" in cypher
+    assert "is_connected_to" in cypher
+
+
+@pytest.mark.asyncio
+async def test_get_relationship_not_found(goat, mock_graph):
+    mock_graph.query.return_value = make_result()
+    assert await goat.get_relationship("no-such-uuid") is None
+
+
+# ---------------------------------------------------------------------------
+# get_relationships props filter + limit — unit tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_get_relationships_props_filter(goat, mock_graph):
+    mock_graph.query.return_value = make_result()
+    await goat.get_relationships(props={"state": "pending"})
+    cypher = mock_graph.query.call_args[0][0]
+    params = mock_graph.query.call_args[0][1]
+    assert "r.state = $prop_state" in cypher
+    assert params["prop_state"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_get_relationships_limit(goat, mock_graph):
+    mock_graph.query.return_value = make_result()
+    await goat.get_relationships(limit=10)
+    cypher = mock_graph.query.call_args[0][0]
+    assert "LIMIT 10" in cypher
+
+
+@pytest.mark.asyncio
+async def test_get_relationships_props_and_limit_combined(goat, mock_graph):
+    mock_graph.query.return_value = make_result()
+    await goat.get_relationships(source="a", props={"state": "active"}, limit=5)
+    cypher = mock_graph.query.call_args[0][0]
+    params = mock_graph.query.call_args[0][1]
+    assert "n.nodeid = $source" in cypher
+    assert "r.state = $prop_state" in cypher
+    assert "LIMIT 5" in cypher
+    assert params["source"] == "a"
+    assert params["prop_state"] == "active"
+
+
+# ---------------------------------------------------------------------------
 # Integration tests — require a live FalkorDB at localhost:6379
 # ---------------------------------------------------------------------------
 
