@@ -129,8 +129,15 @@ def register_routes(app):
         source = request.args.get('source')
         target = request.args.get('target')
         story = request.args.get('story')
+        limit_str = request.args.get('limit')
+        limit = int(limit_str) if limit_str is not None else None
+        # Any remaining query params are treated as props filters
+        _reserved = {'source', 'target', 'story', 'limit'}
+        props = {k: v for k, v in request.args.items() if k not in _reserved} or None
         try:
-            rels = await get_active_goat().get_relationships(source, target, story)
+            rels = await get_active_goat().get_relationships(
+                source, target, story, props=props, limit=limit
+            )
             return jsonify(rels), 200
         except Exception as e:
             return jsonify({"error": f"Failed to get relationships: {str(e)}"}), 500

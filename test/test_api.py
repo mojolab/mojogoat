@@ -224,5 +224,68 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('error'), "Missing required field: config_path for neo4j goat")
 
+    def test_health_endpoint(self):
+        """Test GET /health liveness check"""
+        response = self.client.get('/health')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data.get('status'), 'ok')
+        self.assertIn('goat_count', data)
+        self.assertIn('active_goat', data)
+
+    def test_health_reflects_goat_count(self):
+        """Test that /health goat_count updates when goats are added"""
+        r1 = self.client.get('/health')
+        count_before = json.loads(r1.data)['goat_count']
+
+        self.client.post('/api/goats', json={"name": "hgoat", "type": "text"})
+
+        r2 = self.client.get('/health')
+        self.assertEqual(json.loads(r2.data)['goat_count'], count_before + 1)
+
+    def test_get_relationships_props_filter(self):
+        """Test GET /api/relationships filters by arbitrary props and limit"""
+        import asyncio
+        import mojogoatapi
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        g = MemoryGoat()
+        asyncio.run(g.add_node("a"))
+        asyncio.run(g.add_node("b"))
+        asyncio.run(g.add_node("c"))
+        asyncio.run(g.create_relationship("a", "b", "KNOWS", state="pending"))
+        asyncio.run(g.create_relationship("a", "c", "KNOWS", state="confirmed"))
+
+        mojogoatapi.active_goat = g
+        mojogoatapi.active_goat_name = "test_mem"
+
+        # Filter by props (state=pending)
+        r = self.client.get('/api/relationships?state=pending')
+        self.assertEqual(r.status_code, 200)
+        rels = json.loads(r.data)
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]['target_id'], 'b')
+
+        # Filter by target
+        r = self.client.get('/api/relationships?target=c')
+        self.assertEqual(r.status_code, 200)
+        rels = json.loads(r.data)
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]['state'], 'confirmed')
+
+        # Limit
+        r = self.client.get('/api/relationships?limit=1')
+        self.assertEqual(r.status_code, 200)
+        rels = json.loads(r.data)
+        self.assertEqual(len(rels), 1)
+
+        # Combined: story + props + target
+        r = self.client.get('/api/relationships?story=KNOWS&state=confirmed&target=c')
+        self.assertEqual(r.status_code, 200)
+        rels = json.loads(r.data)
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]['source_id'], 'a')
+
+
 if __name__ == '__main__':
     unittest.main()

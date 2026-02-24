@@ -51,7 +51,7 @@ Done 2026-02-24. pyproject.toml now reads `version = "0.2.0"`.
 
 ---
 
-## Item 6 — Add `PATCH /api/relationships/<id>` for property updates
+## Item 6 — Add `PATCH /api/relationships/<id>` for property updates ✅
 
 **Found during:** Xetrapal MojoGoatSmritiGraph integration (2026-02-24).
 
@@ -79,7 +79,7 @@ Xetrapal integration test: `tests/integration/test_mojogoat_api.py::test_item6_p
 
 ---
 
-## Item 7 — Add FalkorDB backend support to REST API
+## Item 7 — Add FalkorDB backend support to REST API ✅
 
 **Found during:** Xetrapal setup (2026-02-24).
 
@@ -111,7 +111,7 @@ what backend is behind a named goat.
 
 ---
 
-## Item 8 — Add `GET /health` endpoint
+## Item 8 — Add `GET /health` endpoint ✅
 
 **Found during:** Xetrapal ADR 018 (management REPL), 2026-02-24.
 
@@ -138,7 +138,7 @@ Tests: `GET /health → {"status": "ok"}` with status 200.
 
 ---
 
-## Item 9 — Verify/add `?target=<uri>` filter in `GET /api/relationships`
+## Item 9 — Verify/add `?target=<uri>` filter in `GET /api/relationships` ✅
 
 **Found during:** Xetrapal ADR 018 (management REPL — "list jeevas"), 2026-02-24.
 
@@ -158,3 +158,31 @@ with `story=is+a&smriti_state=confirmed` and filters `target == "type:jeeva"` in
 This is acceptable for small registries but will not scale.
 
 Tests: add `test_filter_by_target` to test_textgoat_async.py and test_falkorgoat_async.py.
+
+---
+
+## Item 10 — `POST /api/nodes` returns 500 for node IDs containing slashes
+
+**Found during:** Xetrapal `create jeeva` command (2026-02-25).
+
+When a `nodeid` contains literal slash characters (e.g. `val:/xpal-data/xpals/xpal1`),
+`POST /api/nodes` returns 500 instead of a descriptive 400. The caller (Xetrapal) sees
+`add_node returned 500` in a log warning, then gets a 400 on the subsequent relationship
+write because the node was never created.
+
+**Root cause:** Slashes in the `nodeid` JSON field likely collide with internal URL routing
+or path handling in TextGoat's file-based storage (the node ID is used as a filename or
+dict key that breaks on `/`).
+
+**Fix:** `POST /api/nodes` should validate `nodeid` and return `400 Bad Request` with a
+clear message if the ID contains characters that cannot be stored. Alternatively, percent-
+encode the nodeid internally before use in storage.
+
+**Xetrapal fix applied:** `prefixes.literal()` now uses `urllib.parse.quote(safe='')` so
+literal values (paths, URLs, etc.) are always percent-encoded before becoming `val:` URIs
+(e.g. `val:%2Fxpal-data%2Fxpals%2Fxpal1`). MojoGOAT never receives a raw slash in a URI.
+
+**Remaining MojoGOAT action:** Harden `POST /api/nodes` to return 400 with a useful
+message instead of 500 when the nodeid is malformed, so callers get actionable errors.
+
+Tests: `test_post_node_with_slash_returns_400` in test_mojogoatapi.py.

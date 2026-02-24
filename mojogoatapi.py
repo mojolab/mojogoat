@@ -319,6 +319,83 @@ def create_goat():
     
     return jsonify({"message": f"Goat '{data.get('name')}' created successfully", "goat": goat_config}), 201
 
+
+@app.route('/api/goats/<name>/summary', methods=['GET'])
+async def goat_summary(name):
+    """Return node count, rel count, and taxonomy for a named goat without changing the active goat."""
+    goat_cfg = next((g for g in registry.get('goats', []) if g.get('name') == name), None)
+    if goat_cfg is None:
+        return jsonify({'error': f"Goat '{name}' not found"}), 404
+
+    goat_type = goat_cfg.get('type')
+    is_active = (name == active_goat_name)
+
+    def _ok(node_count, rel_count, taxonomy):
+        return jsonify({'name': name, 'type': goat_type, 'active': is_active,
+                        'node_count': node_count, 'rel_count': rel_count, 'taxonomy': taxonomy})
+
+    def _unavailable(note=None, error=None):
+        d = {'name': name, 'type': goat_type, 'active': is_active,
+             'node_count': None, 'rel_count': None, 'taxonomy': {}}
+        if note:
+            d['note'] = note
+        if error:
+            d['error'] = error
+        return jsonify(d)
+
+    try:
+        if goat_type == 'text':
+            from mojogoat.goatbases.textgoat import TextGoat
+            g = TextGoat(goat_cfg)
+            nodes, rels, taxonomy = await asyncio.gather(
+                g.get_nodes(), g.get_relationships(), g.get_taxonomy()
+            )
+            return _ok(len(nodes), len(rels), taxonomy)
+
+        if goat_type == 'memory':
+            if is_active and active_goat is not None:
+                nodes, rels, taxonomy = await asyncio.gather(
+                    active_goat.get_nodes(), active_goat.get_relationships(), active_goat.get_taxonomy()
+                )
+                return _ok(len(nodes), len(rels), taxonomy)
+            return _unavailable(note='in-memory state only accessible when active')
+
+        if goat_type == 'falkordb':
+            try:
+                from mojogoat.goatbases.falkorgoat import FalkorGoat
+                g = FalkorGoat(
+                    host=goat_cfg.get('host', 'localhost'),
+                    port=int(goat_cfg.get('port', 6379)),
+                    graph_name=goat_cfg.get('graph_name', name),
+                    password=goat_cfg.get('password'),
+                )
+                nodes, rels, taxonomy = await asyncio.wait_for(
+                    asyncio.gather(g.get_nodes(), g.get_relationships(), g.get_taxonomy()),
+                    timeout=2.0,
+                )
+                return _ok(len(nodes), len(rels), taxonomy)
+            except Exception:
+                return _unavailable(error='service unavailable')
+
+        if goat_type == 'neo4j':
+            try:
+                from mojogoat.goatbases.neo4jgoat import Neo4jGoat
+                g = Neo4jGoat(goat_cfg.get('config_path'))
+                nodes, rels, taxonomy = await asyncio.wait_for(
+                    asyncio.gather(g.get_nodes(), g.get_relationships(), g.get_taxonomy()),
+                    timeout=3.0,
+                )
+                await g.close()
+                return _ok(len(nodes), len(rels), taxonomy)
+            except Exception:
+                return _unavailable(error='service unavailable')
+
+        return jsonify({'error': f"Unsupported type: {goat_type}"}), 400
+
+    except Exception as e:
+        return jsonify({'name': name, 'type': goat_type, 'error': str(e)}), 500
+
+
 @app.route('/api/registry', methods=['GET'])
 def get_registry_path():
     """Get the current registry path"""
@@ -519,6 +596,7 @@ def get_status():
     ]
 
     operations = [
+        {"method": "GET",    "path": "/health",                             "description": "Liveness check — always 200 if the server is up"},
         {"method": "GET",    "path": "/api/status",                         "description": "API self-test (this endpoint)"},
         {"method": "GET",    "path": "/api/goats",                          "description": "List all registered goats"},
         {"method": "POST",   "path": "/api/goats",                          "description": "Create a new goat (type: text|falkordb|memory|neo4j)"},
@@ -553,6 +631,20 @@ def get_status():
         "goats": goats,
         "backends": backends,
         "operations": operations,
+    }), 200
+
+
+# ---------------------------------------------------------------------------
+# Health / liveness
+# ---------------------------------------------------------------------------
+
+@app.route('/health', methods=['GET'])
+def health():
+    """Liveness check — returns 200 if the server is running."""
+    return jsonify({
+        "status": "ok",
+        "goat_count": len(registry.get("goats", [])),
+        "active_goat": active_goat_name,
     }), 200
 
 
