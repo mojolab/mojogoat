@@ -155,9 +155,9 @@ Commit messages: conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `t
 - [x] TextGoat — async, UUID v4, ISO-8601, `**props`, full async pytest suite
 - [x] Neo4jGoat (`newneo4jgoatcopilot.py`) — async, UUID v4, ISO-8601, `**props`
 - [x] `neo4jgoat.py` (py2neo) — retired, raises `ImportError`
-- [ ] Neo4jGoat async pytest suite — manual test script exists; needs proper `pytest` variant
+- [x] Neo4jGoat async pytest suite — `test/test_newneo4jgoatcopilot.py` (skipped gracefully when `neo4j` not installed)
 - [ ] MongogoatModels — deferred
-- [ ] FalkorDB backend — see Phase 1 section below
+- [x] FalkorDB backend — `falkorgoat.py`, 25 unit + 3 integration tests
 
 ---
 
