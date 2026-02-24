@@ -12,7 +12,8 @@ All Phase 1 tasks are complete:
 - [x] docs/adr/ with 5 ADRs
 - [x] CLAUDE.md roadmap checkboxes updated
 
-**Action:** `git tag v0.2.0` then update xetrapal3's pyproject.toml to reference the tag.
+**Action:** ~~`git tag v0.2.0`~~ Done locally (2026-02-24). pyproject.toml comment updated to correct GitLab URL.
+**Pending:** `git push origin v0.2.0` — needs GitLab auth (no credentials in dev container).
 
 ---
 
