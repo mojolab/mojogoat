@@ -151,6 +151,7 @@ class FalkorGoat(GoatBase):
         story: str | None = None,
         props: dict | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict]:
         """Return ``is_connected_to`` relationships, optionally filtered."""
         conditions: list[str] = []
@@ -172,10 +173,11 @@ class FalkorGoat(GoatBase):
                 params[param_name] = v
 
         where = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        skip_clause = f" SKIP {int(offset)}" if offset is not None else ""
         limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
         query = (
             f"MATCH (n:Node)-[r:{REL_CONNECTED}]->(m:Node){where} "
-            f"RETURN n.nodeid, r, m.nodeid{limit_clause}"
+            f"RETURN n.nodeid, r, m.nodeid{skip_clause}{limit_clause}"
         )
         result = await self._graph.query(query, params)
         return [

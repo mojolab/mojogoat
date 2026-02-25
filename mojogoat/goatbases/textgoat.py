@@ -202,6 +202,7 @@ class TextGoat(GoatBase):
         story: str | None = None,
         props: dict | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict]:
         """Return relationships, optionally filtered by source / target / story / props."""
         relationships = []
@@ -210,6 +211,7 @@ class TextGoat(GoatBase):
         except Exception:
             return relationships
 
+        skipped = 0
         for line in lines:
             parts = line.split("|")
             if len(parts) < 3:
@@ -236,6 +238,9 @@ class TextGoat(GoatBase):
                (target is None or reldict["target_id"] == target) and \
                (story is None or reldict["story"] == story):
                 if props and not all(reldict.get(k) == v for k, v in props.items()):
+                    continue
+                if offset is not None and skipped < offset:
+                    skipped += 1
                     continue
                 relationships.append(reldict)
                 if limit is not None and len(relationships) >= limit:

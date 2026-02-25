@@ -85,6 +85,11 @@ def register_routes(app):
         data = request.json
         if not data or not data.get("nodeid"):
             return jsonify({"error": "Missing required field: nodeid"}), 400
+        nodeid_raw = data.get("nodeid", "")
+        if '/' in nodeid_raw:
+            return jsonify({
+                "error": f"nodeid must not contain '/'. Use percent-encoding (e.g. '%2F') for literal slashes."
+            }), 400
         try:
             node_data = dict(data)
             nodeid = node_data.pop("nodeid")
@@ -130,13 +135,15 @@ def register_routes(app):
         target = request.args.get('target')
         story = request.args.get('story')
         limit_str = request.args.get('limit')
+        offset_str = request.args.get('offset')
         limit = int(limit_str) if limit_str is not None else None
+        offset = int(offset_str) if offset_str is not None else None
         # Any remaining query params are treated as props filters
-        _reserved = {'source', 'target', 'story', 'limit'}
+        _reserved = {'source', 'target', 'story', 'limit', 'offset'}
         props = {k: v for k, v in request.args.items() if k not in _reserved} or None
         try:
             rels = await get_active_goat().get_relationships(
-                source, target, story, props=props, limit=limit
+                source, target, story, props=props, limit=limit, offset=offset
             )
             return jsonify(rels), 200
         except Exception as e:

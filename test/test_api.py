@@ -243,6 +243,21 @@ class MojoGoatAPITestCase(unittest.TestCase):
         r2 = self.client.get('/health')
         self.assertEqual(json.loads(r2.data)['goat_count'], count_before + 1)
 
+    def test_post_node_with_slash_returns_400(self):
+        """Test that nodeids containing '/' return 400 with a useful message"""
+        import asyncio
+        import mojogoatapi
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        mojogoatapi.active_goat = MemoryGoat()
+        mojogoatapi.active_goat_name = "test_mem"
+
+        r = self.client.post('/api/nodes', json={"nodeid": "val:/some/path"})
+        self.assertEqual(r.status_code, 400)
+        data = json.loads(r.data)
+        self.assertIn("nodeid", data["error"])
+        self.assertIn("/", data["error"])
+
     def test_get_relationships_props_filter(self):
         """Test GET /api/relationships filters by arbitrary props and limit"""
         import asyncio
@@ -285,6 +300,34 @@ class MojoGoatAPITestCase(unittest.TestCase):
         rels = json.loads(r.data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['source_id'], 'a')
+
+    def test_get_relationships_offset(self):
+        """Test GET /api/relationships?offset=N paginates correctly"""
+        import asyncio
+        import mojogoatapi
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        g = MemoryGoat()
+        asyncio.run(g.add_node("src"))
+        for i in range(5):
+            asyncio.run(g.add_node(f"tgt{i}"))
+            asyncio.run(g.create_relationship("src", f"tgt{i}", "LINKED"))
+
+        mojogoatapi.active_goat = g
+        mojogoatapi.active_goat_name = "test_mem"
+
+        all_r = self.client.get('/api/relationships')
+        all_rels = json.loads(all_r.data)
+        self.assertEqual(len(all_rels), 5)
+
+        r = self.client.get('/api/relationships?offset=2')
+        paged = json.loads(r.data)
+        self.assertEqual(len(paged), 3)
+        self.assertEqual(paged[0]['relationship_id'], all_rels[2]['relationship_id'])
+
+        r2 = self.client.get('/api/relationships?offset=2&limit=2')
+        paged2 = json.loads(r2.data)
+        self.assertEqual(len(paged2), 2)
 
 
 if __name__ == '__main__':

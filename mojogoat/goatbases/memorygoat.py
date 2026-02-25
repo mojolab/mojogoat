@@ -71,9 +71,11 @@ class MemoryGoat(GoatBase):
         story: str | None = None,
         props: dict | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict]:
         """Return relationships, optionally filtered."""
         results: list[dict] = []
+        skipped = 0
         for rel in self._rels:
             if source is not None and rel["source_id"] != source:
                 continue
@@ -82,6 +84,9 @@ class MemoryGoat(GoatBase):
             if story is not None and rel["story"] != story:
                 continue
             if props and not all(rel.get(k) == v for k, v in props.items()):
+                continue
+            if offset is not None and skipped < offset:
+                skipped += 1
                 continue
             results.append(dict(rel))
             if limit is not None and len(results) >= limit:

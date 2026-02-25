@@ -161,7 +161,7 @@ Tests: add `test_filter_by_target` to test_textgoat_async.py and test_falkorgoat
 
 ---
 
-## Item 10 — `POST /api/nodes` returns 500 for node IDs containing slashes
+## Item 10 — `POST /api/nodes` returns 500 for node IDs containing slashes ✅
 
 **Found during:** Xetrapal `create jeeva` command (2026-02-25).
 

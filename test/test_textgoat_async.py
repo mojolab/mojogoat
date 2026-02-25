@@ -285,6 +285,24 @@ async def test_get_relationships_props_and_limit_combined(goat):
     assert active[0]["state"] == "active"
 
 
+@pytest.mark.asyncio
+async def test_get_relationships_offset(goat):
+    await goat.add_node("src")
+    for i in range(5):
+        await goat.add_node(f"tgt{i}")
+        await goat.create_relationship("src", f"tgt{i}", "LINKED")
+
+    all_rels = await goat.get_relationships()
+    assert len(all_rels) == 5
+
+    paged = await goat.get_relationships(offset=2)
+    assert len(paged) == 3
+
+    paged2 = await goat.get_relationships(offset=2, limit=2)
+    assert len(paged2) == 2
+    assert paged2[0]["relationship_id"] == all_rels[2]["relationship_id"]
+
+
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------

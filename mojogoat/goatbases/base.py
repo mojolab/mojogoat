@@ -36,6 +36,7 @@ class GoatBase(ABC):
         story: str | None = None,
         props: dict | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict]: ...
 
     @abstractmethod
@@ -72,3 +73,7 @@ class GoatBase(ABC):
 
     @abstractmethod
     async def link_is(self, node1_id: str, node2_id: str) -> None: ...
+
+    async def close(self) -> None:
+        """Close any underlying connections. No-op for backends with no connection."""
+        pass

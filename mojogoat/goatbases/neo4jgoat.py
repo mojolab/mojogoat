@@ -117,6 +117,7 @@ class Neo4jGoat(GoatBase):
         story: str | None = None,
         props: dict | None = None,
         limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict]:
         """Return relationships, optionally filtered."""
         conditions = []
@@ -137,11 +138,12 @@ class Neo4jGoat(GoatBase):
                 params[param_name] = v
 
         where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        skip_clause = f" SKIP {int(offset)}" if offset is not None else ""
         limit_clause = f" LIMIT {int(limit)}" if limit is not None else ""
         query = (
             f"MATCH (n)-[r:{REL_CONNECTED}]->(m){where_clause} "
             "RETURN n.nodeid AS src, r.stories AS stories, m.nodeid AS tgt, "
-            f"r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props{limit_clause}"
+            f"r.timestamp AS ts, r.relationship_id AS rid, properties(r) AS props{skip_clause}{limit_clause}"
         )
 
         rels = []
