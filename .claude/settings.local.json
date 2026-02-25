@@ -6,7 +6,9 @@
       "Bash(git diff -w HEAD -- mojogoat/goatbases/newneo4jgoatcopilot.py | head -40)",
       "Bash(git diff -w HEAD -- tasks/lessons.md)",
       "Bash(uv sync 2>&1)",
-      "Bash(uv run pytest test/ -m \"not integration\" -q 2>&1)"
+      "Bash(uv run pytest test/ -m \"not integration\" -q 2>&1)",
+      "Bash(sleep 3 && curl -s http://localhost:5000/health 2>&1)",
+      "Bash(sleep 2 && curl -s http://localhost:5000/health)"
     ]
   }
 }

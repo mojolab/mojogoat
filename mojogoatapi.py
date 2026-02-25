@@ -12,6 +12,7 @@ MojoGOAT API - A Graph of All Things API
 import asyncio
 import io, os, re, sys
 import json
+import shutil
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
@@ -394,6 +395,84 @@ async def goat_summary(name):
 
     except Exception as e:
         return jsonify({'name': name, 'type': goat_type, 'error': str(e)}), 500
+
+
+@app.route('/api/goats/<name>', methods=['DELETE'])
+async def delete_goat(name):
+    """Remove a goat from the registry.
+
+    Query params:
+        purge=true  — also destroy the backend storage (TextGoat: rm -rf data dir;
+                      FalkorDB: drop the graph; Neo4j: DETACH DELETE all nodes).
+                      Irreversible. MemoryGoat has nothing to purge.
+    """
+    global active_goat, active_goat_name
+
+    goat_cfg = next((g for g in registry.get('goats', []) if g.get('name') == name), None)
+    if goat_cfg is None:
+        return jsonify({'error': f"Goat '{name}' not found"}), 404
+
+    purge = request.args.get('purge', '').lower() == 'true'
+    goat_type = goat_cfg.get('type')
+    purge_error = None
+
+    if purge:
+        try:
+            if goat_type == 'text':
+                goat_path = goat_cfg.get('goatpath')
+                if goat_path and os.path.isdir(goat_path):
+                    shutil.rmtree(goat_path)
+
+            elif goat_type == 'falkordb':
+                from mojogoat.goatbases.falkorgoat import FalkorGoat
+                g = FalkorGoat(
+                    host=goat_cfg.get('host', 'localhost'),
+                    port=int(goat_cfg.get('port', 6379)),
+                    graph_name=goat_cfg.get('graph_name', name),
+                    password=goat_cfg.get('password'),
+                )
+                await asyncio.wait_for(g._graph.delete(), timeout=5.0)
+                await g.close()
+
+            elif goat_type == 'neo4j':
+                from mojogoat.goatbases.neo4jgoat import Neo4jGoat
+                g = Neo4jGoat(goat_cfg.get('config_path'))
+                async with g.driver.session() as session:
+                    await asyncio.wait_for(
+                        session.run("MATCH (n) DETACH DELETE n"),
+                        timeout=10.0,
+                    )
+                await g.close()
+
+            # memory: nothing to purge
+
+        except Exception as exc:
+            purge_error = str(exc)
+
+    # Deactivate in memory if this was the active goat
+    if name == active_goat_name:
+        if active_goat is not None:
+            try:
+                await active_goat.close()
+            except Exception:
+                pass
+        active_goat = None
+        active_goat_name = None
+
+    # Remove from registry
+    registry['goats'] = [g for g in registry.get('goats', []) if g.get('name') != name]
+    if registry.get('default') == name:
+        registry['default'] = None
+    if registry.get('active') == name:
+        registry['active'] = None
+
+    if not save_registry():
+        return jsonify({'error': 'Failed to save registry after deletion'}), 500
+
+    response = {'message': f"Goat '{name}' deleted", 'purged': purge}
+    if purge_error:
+        response['purge_warning'] = f"Registry entry removed but backend purge failed: {purge_error}"
+    return jsonify(response), 200
 
 
 @app.route('/api/registry', methods=['GET'])
