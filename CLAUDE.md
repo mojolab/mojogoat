@@ -29,7 +29,7 @@ mojogoat/
 │   ├── goatbases/
 │   │   ├── textgoat.py        ← file-based backend (done)
 │   │   ├── newneo4jgoatcopilot.py  ← Neo4j async backend (done)
-│   │   ├── falkorgoat.py      ← FalkorDB backend (Phase 1 task)
+│   │   ├── falkorgoat.py      ← FalkorDB backend (done)
 │   │   ├── neo4jgoat.py       ← retired stub (raises ImportError)
 │   │   └── mongogoat/         ← MongoDB+Postgres backend (deferred)
 │   └── __init__.py
@@ -164,62 +164,10 @@ Commit messages: conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `t
 
 ---
 
-## Phase 1: FalkorDB Backend
+## Next Steps
 
-Xetrapal Phase 1 uses FalkorDB as the development graph backend. MojoGOAT needs a
-`FalkorGoat` backend before `FalkorDBSmritiGraph` can be built in Xetrapal.
-
-FalkorDB speaks Cypher and has a Python client (`falkordb` package). The backend will be
-thin — structurally identical to `newneo4jgoatcopilot.py` with FalkorDB client calls.
-
-### Tasks (work in order)
-
-1. **Add `falkordb` to `pyproject.toml`**
-   ```toml
-   [project.optional-dependencies]
-   falkordb = ["falkordb>=1.0"]
-   ```
-   Run `uv sync --extra falkordb` to verify.
-
-2. **Create `mojogoat/goatbases/falkorgoat.py`**
-   - Class `FalkorGoat` with the same interface as `Neo4jGoat`
-   - Constructor: `__init__(self, host, port, graph_name)` — connects via `falkordb.FalkorDB()`
-   - All methods `async def` from the start (use `asyncio.to_thread` to wrap FalkorDB's
-     synchronous client calls until an async client is available)
-   - `create_relationship(source, target, story, **props)` — stores `story` in a `stories`
-     property array on the edge (Cypher model: `is_connected_to` or `is_the_same_as`)
-   - Two relationship types only: `is_the_same_as` and `is_connected_to`
-   - All other properties (`state`, `timestamp`, `relationship_id`, `**props`) stored on the edge
-   - `get_relationships(source, target, story)` — queries by `story IN r.stories`
-
-3. **Export from `__init__.py`**
-   ```python
-   from .falkorgoat import FalkorGoat
-   ```
-
-4. **Write async pytest suite `test/test_falkorgoat_async.py`**
-   - Mirror the structure of `test/test_textgoat_async.py`
-   - Mark integration tests `@pytest.mark.integration` (require live FalkorDB)
-   - Unit tests mock the FalkorDB client
-   - Test: UUID v4 IDs, ISO-8601 timestamps, `**props` round-trip, `state` field stored/retrieved,
-     `is_the_same_as` vs `is_connected_to` relationship type routing
-
-5. **Tag `v0.2.0`** once FalkorGoat tests pass and Neo4jGoat pytest suite is added.
-   Then update Xetrapal to the tag reference:
-   ```toml
-   mojogoat = { git = "https://github.com/you/mojogoat", tag = "v0.2.0" }
-   ```
-
-### Testing
-Run existing tests after each change: `uv run pytest test/`
-Integration tests (requiring live services) are marked `@pytest.mark.integration` and
-skipped by default: `uv run pytest test/ -m "not integration"`
-
-### Xetrapal dependency setup
-Xetrapal references MojoGOAT via:
+Tag `v0.2.0` (all Phase 1 items complete), then update Xetrapal's `pyproject.toml` to use the tag:
 ```toml
-# xetrapal3/pyproject.toml
-[tool.uv.sources]
-mojogoat = { path = "../mojogoat", editable = true }
+mojogoat = { git = "https://github.com/you/mojogoat", tag = "v0.2.0" }
 ```
-Once stable, tag a release (`git tag v0.2.0`) and switch Xetrapal to a git tag reference.
+MongogoatModels remains deferred.
