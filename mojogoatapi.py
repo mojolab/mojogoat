@@ -111,9 +111,8 @@ async def _select_backend(requested_type: str, config: dict):
         return _make_memorygoat(), 'memory'
 
     if requested_type == 'auto':
-        goat = await _probe_falkordb(config)
-        if goat:
-            return goat, 'falkordb'
+        # Auto mode uses only local backends — Neo4j and FalkorDB require
+        # explicit configuration and are never probed automatically (ADR-0010).
         try:
             goat = _make_textgoat(config)
             return goat, 'text'
@@ -643,8 +642,8 @@ def get_status():
     backends = {
         "text":     {"available": True,                    "description": "File-based flat-file backend"},
         "memory":   {"available": True,                    "description": "In-memory backend (no persistence, resets on restart)"},
-        "falkordb": {"available": _can_import("falkordb"), "description": "FalkorDB graph database (requires running FalkorDB/Redis)"},
-        "neo4j":    {"available": _can_import("neo4j"),    "description": "Neo4j graph database"},
+        "neo4j":    {"available": _can_import("neo4j"),    "description": "Neo4j graph database — recommended production backend (ADR-0010)"},
+        "falkordb": {"available": _can_import("falkordb"), "description": "FalkorDB graph database — opt-in, Redis-native deployments only (ADR-0010)"},
     }
 
     active_info = None
@@ -756,7 +755,7 @@ async def set_backend():
       goat_path   — Text backend data directory
       goat_name   — Text backend name                 (default: default)
 
-    Auto mode tries falkordb → text → memory and uses the first available.
+    Auto mode tries text → memory. Neo4j and FalkorDB require explicit configuration (ADR-0010).
     """
     data = request.json or {}
     requested_type = data.get('type', 'auto')
