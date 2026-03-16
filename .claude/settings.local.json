@@ -11,7 +11,8 @@
       "Bash(sleep 2 && curl -s http://localhost:5000/health)",
       "Bash(curl -s http://localhost:5000/health)",
       "Bash(uv run:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git config:*)"
     ]
   }
 }
