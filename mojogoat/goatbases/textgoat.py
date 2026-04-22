@@ -364,6 +364,29 @@ class TextGoat(GoatBase):
             taxonomy[story] = taxonomy.get(story, 0) + 1
         return taxonomy
 
+    async def compact(self) -> int:
+        """Rewrite the current snapshot to a fresh file; delete all orphaned snapshots.
+
+        Returns the number of relationships preserved.
+        """
+        lines = await self._read_rel_lines()
+        await self._write_rel_lines(lines)
+
+        ref_path = os.path.join(self.goatpath, 'goatrels.gq')
+        async with aiofiles.open(ref_path, 'r') as f:
+            current_rel = (await f.read()).strip()
+        current_name = os.path.basename(current_rel)
+
+        snapshots_dir = os.path.join(self.goatpath, 'snapshots')
+        for fname in os.listdir(snapshots_dir):
+            if fname != current_name:
+                try:
+                    os.remove(os.path.join(snapshots_dir, fname))
+                except Exception:
+                    pass
+
+        return len(lines)
+
     async def dump_all_rels(self, filename: str) -> int:
         """Dump all relationships to *filename* in pipe-delimited format."""
         rels = await self.get_relationships()

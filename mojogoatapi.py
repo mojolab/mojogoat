@@ -696,6 +696,14 @@ def get_status():
         {"method": "GET",    "path": "/api/active-goat/composition",        "description": "Node count grouped by label"},
         {"method": "GET",    "path": "/api/active-goat/taxonomy",           "description": "Relationship count grouped by story"},
         {"method": "POST",   "path": "/api/active-goat/dump-relationships", "description": "Dump all relationships to a file (body: {filename})"},
+        {"method": "POST",   "path": "/api/active-goat/compact",            "description": "Compact TextGoat snapshots — rewrite current state, delete orphaned snapshots (ADR-0007)"},
+        {"method": "POST",   "path": "/api/active-goat/import-relationships","description": "Bulk import from a pipe-delimited quad file (body: {filename}) — returns {imported, skipped, errors}"},
+        {"method": "GET",    "path": "/api/graph",                          "description": "Graph data — {nodes, edges, node_count, edge_count}; filters: source, target, story, limit, node_ids (ADR-0011)"},
+        {"method": "POST",   "path": "/api/operations",                     "description": "Create an operation (body: {name, node_ids, params}) (ADR-0012)"},
+        {"method": "GET",    "path": "/api/operations/<id>",                "description": "Get operation status and results (ADR-0012)"},
+        {"method": "POST",   "path": "/api/operations/<id>/results",        "description": "External process posts proposed changes (ADR-0012)"},
+        {"method": "POST",   "path": "/api/operations/<id>/validate",       "description": "Accept or reject individual results (body: {result_id, action}) (ADR-0012)"},
+        {"method": "DELETE", "path": "/api/operations/<id>",                "description": "Cancel and discard an operation (ADR-0012)"},
     ]
 
     return jsonify({
