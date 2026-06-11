@@ -7,7 +7,24 @@ Tag created locally; `git push origin v0.2.0` pending GitLab auth.
 
 ---
 
-# v0.3.0 Plan
+# v0.3.0 — COMPLETE
+
+All items (11–17) implemented and tested as of 2026-06-11. Suite green: 148 passed,
+6 integration deselected. Plan retained below for reference.
+
+| Item | Description | Status |
+|------|-------------|--------|
+| 11 | Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-0010) | done |
+| 12 | `GET /api/graph` endpoint (ADR-0011) | done |
+| 13 | Operations API (ADR-0012) | done |
+| 14 | TextGoat snapshot compaction (ADR-0007) | done |
+| 15 | Bulk import (inverse of dump) | done |
+| 16 | API test coverage gaps | done |
+| 17 | Graph workbench UI (ADR-0013, separate repo) | done |
+
+---
+
+# v0.3.0 Plan (reference)
 
 ## Item 11 — Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-0010)
 
