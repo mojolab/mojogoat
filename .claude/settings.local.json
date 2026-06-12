@@ -12,7 +12,9 @@
       "Bash(curl -s http://localhost:5000/health)",
       "Bash(uv run:*)",
       "Bash(git add:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(awk '/## Item 15/{f=1} f{print} /## Item 15/{c=1} c&&/^---$/{exit}' tasks/todo.md)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
