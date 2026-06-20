@@ -14,7 +14,11 @@
       "Bash(git add:*)",
       "Bash(git config:*)",
       "Bash(awk '/## Item 15/{f=1} f{print} /## Item 15/{c=1} c&&/^---$/{exit}' tasks/todo.md)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(gh repo *)",
+      "Bash(glab auth *)",
+      "Bash(curl -sL https://github.com/cli/cli/releases/latest)",
+      "Bash(apt-cache search *)"
     ]
   }
 }
