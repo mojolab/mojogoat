@@ -15,7 +15,7 @@ def _short_id(n: int = 10) -> str:
     """Return a random *n*-character base-62 string."""
     return "".join(secrets.choice(_ID_ALPHABET) for _ in range(n))
 
-from .base import GoatBase, REL_IDENTITY
+from .base import GoatBase, REL_IDENTITY, format_dump_line
 
 
 class TextGoat(GoatBase):
@@ -388,12 +388,13 @@ class TextGoat(GoatBase):
         return len(lines)
 
     async def dump_all_rels(self, filename: str) -> int:
-        """Dump all relationships to *filename* in pipe-delimited format."""
+        """Dump all relationships to *filename* in pipe-delimited format.
+
+        Includes relationship_id and props so the file is a faithful inverse
+        of import-relationships (round trip must not lose data).
+        """
         rels = await self.get_relationships()
-        lines = [
-            f"{r['source_id']}|{r['story']}|{r['target_id']}|{r['timestamp']}"
-            for r in rels
-        ]
+        lines = [format_dump_line(r) for r in rels]
         dirname = os.path.dirname(filename)
         if dirname:
             os.makedirs(dirname, exist_ok=True)

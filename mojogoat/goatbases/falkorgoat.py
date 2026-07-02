@@ -6,7 +6,7 @@ try:
 except ImportError:
     AsyncFalkorDB = None  # type: ignore[assignment,misc]
 
-from .base import GoatBase, REL_CONNECTED, REL_IDENTITY
+from .base import GoatBase, REL_CONNECTED, REL_IDENTITY, format_dump_line
 
 
 class FalkorGoat(GoatBase):
@@ -290,10 +290,7 @@ class FalkorGoat(GoatBase):
     async def dump_all_rels(self, path: str) -> int:
         """Dump all relationships to *path* in pipe-delimited quad format."""
         rels = await self.get_relationships()
-        lines = [
-            f"{r['source_id']}|{r['story']}|{r['target_id']}|{r['timestamp']}"
-            for r in rels
-        ]
+        lines = [format_dump_line(r) for r in rels]
         with open(path, "w") as f:
             f.write("\n".join(lines))
         return len(rels)
