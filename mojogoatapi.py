@@ -233,6 +233,14 @@ def set_active_goat(goat_name):
     
     if success:
         active_goat_name = goat_name
+        # mojogoat.routes reads the active goat via `import mojogoatapi`, which — since
+        # this script runs as __main__ — resolves to a *separate* module copy of this
+        # file, not this running instance. Push the new goat into that copy too so
+        # routes.py (graph/nodes/relationships/taxonomy/operations-validate) doesn't
+        # stay stuck on whatever goat was active the first time any of its endpoints
+        # ran. See mojolab/mojogoat#20.
+        from mojogoat.routes import set_active_goat_ref
+        set_active_goat_ref(active_goat)
 
     return success
 
