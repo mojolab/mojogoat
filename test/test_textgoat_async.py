@@ -1,4 +1,5 @@
 """Async pytest tests for TextGoat."""
+import asyncio
 import json
 import os
 import pytest
@@ -121,6 +122,30 @@ async def test_create_relationship_missing_node_returns_none(goat):
     await goat.add_node("src")
     result = await goat.create_relationship("src", "missing", "KNOWS")
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_create_relationship_no_lost_updates(goat):
+    """Regression test for issue #17: concurrent writers to the same goat must
+    not clobber each other's read-modify-write of the relationship snapshot."""
+    await goat.add_node("src")
+    n = 20
+    for i in range(n):
+        await goat.add_node(f"tgt{i}")
+
+    results = await asyncio.gather(
+        *(goat.create_relationship("src", f"tgt{i}", "LINKED") for i in range(n))
+    )
+    assert all(r is not None for r in results)
+
+    rels = await goat.get_relationships()
+    assert len(rels) == n
+
+    targets = {r["target_id"] for r in rels}
+    assert targets == {f"tgt{i}" for i in range(n)}
+
+    rel_ids = {r["relationship_id"] for r in rels}
+    assert len(rel_ids) == n  # every relationship_id is unique — nothing lost
 
 
 @pytest.mark.asyncio

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import json
 import re
@@ -16,6 +17,12 @@ def _short_id(n: int = 10) -> str:
     return "".join(secrets.choice(_ID_ALPHABET) for _ in range(n))
 
 from .base import GoatBase, REL_IDENTITY, format_dump_line
+
+# Per-goatpath locks guarding the relationship read-modify-write sequence
+# (create/update/delete). Keyed by goatpath rather than per-instance so that
+# any two TextGoat instances pointing at the same directory are serialized,
+# while writes to different goats never block each other.
+_REL_WRITE_LOCKS: dict[str, asyncio.Lock] = {}
 
 
 class TextGoat(GoatBase):
@@ -44,6 +51,14 @@ class TextGoat(GoatBase):
 
     def _node_path(self, nodeid: str) -> str:
         return os.path.join(self.goatpath, "nodes", nodeid)
+
+    def _rel_write_lock(self) -> asyncio.Lock:
+        """Return the asyncio.Lock guarding relationship writes for this goatpath."""
+        lock = _REL_WRITE_LOCKS.get(self.goatpath)
+        if lock is None:
+            lock = asyncio.Lock()
+            _REL_WRITE_LOCKS[self.goatpath] = lock
+        return lock
 
     def _rel_id_from_line(self, line: str, parts: list[str]) -> str:
         """Return the relationship UUID for a .gq line.
@@ -276,10 +291,11 @@ class TextGoat(GoatBase):
             if props:
                 line += f"|{json.dumps(props, separators=(',', ':'))}"
 
-            lines = await self._read_rel_lines()
-            if line not in lines:
-                lines.append(line)
-            await self._write_rel_lines(lines)
+            async with self._rel_write_lock():
+                lines = await self._read_rel_lines()
+                if line not in lines:
+                    lines.append(line)
+                await self._write_rel_lines(lines)
 
             return {
                 "source_id": source,
@@ -295,19 +311,20 @@ class TextGoat(GoatBase):
     async def delete_relationship(self, relationship_id: str) -> bool:
         """Delete a relationship by its UUID. Returns True on success."""
         try:
-            lines = await self._read_rel_lines()
-            new_lines = []
-            found = False
-            for line in lines:
-                parts = line.split("|")
-                rid = self._rel_id_from_line(line, parts)
-                if rid == relationship_id:
-                    found = True
-                else:
-                    new_lines.append(line)
-            if not found:
-                return False
-            await self._write_rel_lines(new_lines)
+            async with self._rel_write_lock():
+                lines = await self._read_rel_lines()
+                new_lines = []
+                found = False
+                for line in lines:
+                    parts = line.split("|")
+                    rid = self._rel_id_from_line(line, parts)
+                    if rid == relationship_id:
+                        found = True
+                    else:
+                        new_lines.append(line)
+                if not found:
+                    return False
+                await self._write_rel_lines(new_lines)
             return True
         except Exception:
             return False
@@ -319,27 +336,28 @@ class TextGoat(GoatBase):
         changed — only the extra properties are updated.
         """
         try:
-            lines = await self._read_rel_lines()
-            new_lines = []
-            found = False
-            for line in lines:
-                parts = line.split("|")
-                rid = self._rel_id_from_line(line, parts)
-                if rid == relationship_id:
-                    found = True
-                    existing_props: dict = {}
-                    if len(parts) >= 6:
-                        try:
-                            existing_props = json.loads("|".join(parts[5:]))
-                        except (json.JSONDecodeError, ValueError):
-                            pass
-                    existing_props.update(props)
-                    base = "|".join(parts[:5])
-                    line = f"{base}|{json.dumps(existing_props, separators=(',', ':'))}"
-                new_lines.append(line)
-            if not found:
-                return False
-            await self._write_rel_lines(new_lines)
+            async with self._rel_write_lock():
+                lines = await self._read_rel_lines()
+                new_lines = []
+                found = False
+                for line in lines:
+                    parts = line.split("|")
+                    rid = self._rel_id_from_line(line, parts)
+                    if rid == relationship_id:
+                        found = True
+                        existing_props: dict = {}
+                        if len(parts) >= 6:
+                            try:
+                                existing_props = json.loads("|".join(parts[5:]))
+                            except (json.JSONDecodeError, ValueError):
+                                pass
+                        existing_props.update(props)
+                        base = "|".join(parts[:5])
+                        line = f"{base}|{json.dumps(existing_props, separators=(',', ':'))}"
+                    new_lines.append(line)
+                if not found:
+                    return False
+                await self._write_rel_lines(new_lines)
             return True
         except Exception:
             return False
