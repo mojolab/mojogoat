@@ -11,6 +11,8 @@ import tempfile
 import shutil
 from datetime import datetime
 
+import pytest
+
 import sys
 sys.path.append("/xpal-src/mojogoat")
 
@@ -95,6 +97,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_create_neo4j_goat(self):
         """Test creating a Neo4j goat"""
+        pytest.importorskip("neo4j")
         config_path = os.path.join(self.test_dir, "neo4j_config.json")
         with open(config_path, 'w') as f:
             json.dump({
@@ -693,6 +696,42 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(rels[0]['source_id'], 'a')
         self.assertEqual(rels[0]['target_id'], 'b')
         self.assertEqual(rels[0]['story'], 'KNOWS')
+
+    def test_import_relationships_round_trip_preserves_props(self):
+        """dump → import must not drop relationship_id or **props (regression for #16)"""
+        import asyncio
+        import mojogoatapi
+        from mojogoat.goatbases.textgoat import TextGoat
+
+        src_dir = os.path.join(self.test_dir, "src_props_goat")
+        src = TextGoat({"goatpath": src_dir, "goatname": "src"})
+        asyncio.run(src.add_node("a"))
+        asyncio.run(src.add_node("b"))
+        created = asyncio.run(
+            src.create_relationship("a", "b", "KNOWS", smriti_state="confirmed", weight=3)
+        )
+
+        dump_file = os.path.join(self.test_dir, "dump_props.gq")
+        asyncio.run(src.dump_all_rels(dump_file))
+
+        dst_dir = os.path.join(self.test_dir, "dst_props_goat")
+        dst = TextGoat({"goatpath": dst_dir, "goatname": "dst"})
+        mojogoatapi.active_goat = dst
+        mojogoatapi.active_goat_name = "dst"
+
+        r = self.client.post('/api/active-goat/import-relationships', json={"filename": dump_file})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertEqual(data['imported'], 1)
+        self.assertEqual(data['errors'], [])
+
+        rels = asyncio.run(dst.get_relationships())
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]['smriti_state'], 'confirmed')
+        self.assertEqual(rels[0]['weight'], 3)
+        # import-relationships creates a fresh relationship via create_relationship(),
+        # so the destination gets its own goat-scoped ID rather than reusing the source's.
+        self.assertNotEqual(rels[0]['relationship_id'], created['relationship_id'])
 
     def test_import_missing_filename_returns_400(self):
         """POST /api/active-goat/import-relationships without filename returns 400"""
