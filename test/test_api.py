@@ -30,6 +30,10 @@ class MojoGoatAPITestCase(unittest.TestCase):
         # Create a temporary registry file
         self.registry_file = os.path.join(self.test_dir, "test_registry.json")
 
+        # Keep operations.py's persistence (ADR-0014) out of the real /xpal-data
+        self._prev_operations_dir = os.environ.get("MOJOGOAT_OPERATIONS_DIR")
+        os.environ["MOJOGOAT_OPERATIONS_DIR"] = os.path.join(self.test_dir, "operations")
+
         app.config['TESTING'] = True
 
         import mojogoatapi
@@ -49,6 +53,11 @@ class MojoGoatAPITestCase(unittest.TestCase):
     def tearDown(self):
         """Clean up test environment"""
         shutil.rmtree(self.test_dir)
+
+        if self._prev_operations_dir is None:
+            os.environ.pop("MOJOGOAT_OPERATIONS_DIR", None)
+        else:
+            os.environ["MOJOGOAT_OPERATIONS_DIR"] = self._prev_operations_dir
 
     def test_list_goats_empty(self):
         """Test listing goats when the registry is empty"""

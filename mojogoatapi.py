@@ -814,6 +814,12 @@ if __name__ == '__main__':
     # Initialize the app
     initialize_app()
 
+    # Reload any operations left awaiting validation across a restart (ADR-0014)
+    from mojogoat import operations
+    loaded = operations.load_persisted()
+    if loaded:
+        print(f" * Reloaded {loaded} persisted operation(s)")
+
     # Auto-detect backend if registry didn't provide one
     if active_goat is None:
         loop = asyncio.new_event_loop()

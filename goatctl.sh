@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="/xpal-data/run/mojogoat.pid"
 LOG_FILE="/xpal-data/logs/mojogoat.log"
-PORT="${MOJOGOAT_PORT:-5000}"
+PORT="${MOJOGOAT_PORT:-5001}"
 HOST="${MOJOGOAT_HOST:-0.0.0.0}"
 
 mkdir -p "$(dirname "$PID_FILE")" "$(dirname "$LOG_FILE")"
