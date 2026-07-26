@@ -756,6 +756,78 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIn('not found', json.loads(r.data)['error'])
 
+    def test_switching_active_goat_updates_routes_endpoints(self):
+        """POST /api/active-goat must be reflected by routes.py endpoints (regression for #20).
+
+        Goes through the real set_active_goat() path (not a direct `mojogoatapi.active_goat =`
+        assignment, which other tests use as a shortcut) so it actually exercises the
+        routes.set_active_goat_ref() sync that #20's fix added.
+        """
+        goat1 = {
+            "name": "goat_one",
+            "type": "text",
+            "goat_path": os.path.join(self.test_dir, "goat_one"),
+            "make_active": True,
+        }
+        goat2 = {
+            "name": "goat_two",
+            "type": "text",
+            "goat_path": os.path.join(self.test_dir, "goat_two"),
+        }
+        self.assertEqual(self.client.post('/api/goats', json=goat1).status_code, 201)
+        self.assertEqual(self.client.post('/api/goats', json=goat2).status_code, 201)
+
+        self.assertEqual(
+            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_one"}).status_code, 201
+        )
+
+        r = self.client.post('/api/active-goat', json={"name": "goat_two"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_two"}).status_code, 201
+        )
+
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        self.assertEqual(nodeids, {"only_in_goat_two"})
+
+        self.client.post('/api/active-goat', json={"name": "goat_one"})
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        self.assertEqual(nodeids, {"only_in_goat_one"})
+
+
+class RoutesActiveGoatIsolationTestCase(unittest.TestCase):
+    """Unit tests for mojogoat.routes.get_active_goat()/check_active_goat() (regression for #20)."""
+
+    def test_get_active_goat_reflects_set_active_goat_ref(self):
+        from mojogoat.routes import get_active_goat, set_active_goat_ref
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        set_active_goat_ref(None)
+        self.assertIsNone(get_active_goat())
+
+        goat = MemoryGoat()
+        set_active_goat_ref(goat)
+        self.assertIs(get_active_goat(), goat)
+
+        set_active_goat_ref(None)
+        self.assertIsNone(get_active_goat())
+
+    def test_check_active_goat_errors_only_when_none(self):
+        from mojogoatapi import app
+        from mojogoat.routes import check_active_goat, set_active_goat_ref
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        with app.app_context():
+            set_active_goat_ref(None)
+            error_response = check_active_goat()
+            self.assertIsNotNone(error_response)
+            self.assertEqual(error_response[1], 404)
+
+            set_active_goat_ref(MemoryGoat())
+            self.assertIsNone(check_active_goat())
+
+            set_active_goat_ref(None)
+
 
 if __name__ == '__main__':
     unittest.main()
