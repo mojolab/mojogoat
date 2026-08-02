@@ -138,6 +138,9 @@ Prune `tasks/lessons.md` when it exceeds 20 entries. Keep it short enough to rea
 
 Branch naming: `phase/N-description` for phase work, `fix/short-description` for fixes.
 Commit messages: conventional commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`).
+Every commit carries a `Coding-Agent:` trailer (`claude`, `opencode`, or `manual`)
+via the `prepare-commit-msg` hook (see `.githooks/`). Enable it with:
+`git config core.hooksPath .githooks`.
 
 ---
 
