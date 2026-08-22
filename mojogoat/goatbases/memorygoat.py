@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import aiofiles
 
-from .base import GoatBase, REL_IDENTITY
+from .base import GoatBase, REL_IDENTITY, format_dump_line
 
 
 class MemoryGoat(GoatBase):
@@ -159,10 +159,7 @@ class MemoryGoat(GoatBase):
         dirname = os.path.dirname(path)
         if dirname:
             os.makedirs(dirname, exist_ok=True)
-        lines = [
-            f"{r['source_id']}|{r['story']}|{r['target_id']}|{r['timestamp']}"
-            for r in self._rels
-        ]
+        lines = [format_dump_line(r) for r in self._rels]
         async with aiofiles.open(path, "w") as f:
             await f.write("\n".join(lines))
         return len(self._rels)

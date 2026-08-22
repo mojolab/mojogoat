@@ -11,6 +11,8 @@ import tempfile
 import shutil
 from datetime import datetime
 
+import pytest
+
 import sys
 sys.path.append("/xpal-src/mojogoat")
 
@@ -29,6 +31,10 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
         # Create a temporary registry file
         self.registry_file = os.path.join(self.test_dir, "test_registry.json")
+
+        # Keep operations.py's persistence (ADR-0014) out of the real /xpal-data
+        self._prev_operations_dir = os.environ.get("MOJOGOAT_OPERATIONS_DIR")
+        os.environ["MOJOGOAT_OPERATIONS_DIR"] = os.path.join(self.test_dir, "operations")
 
         app.config['TESTING'] = True
 
@@ -49,6 +55,11 @@ class MojoGoatAPITestCase(unittest.TestCase):
     def tearDown(self):
         """Clean up test environment"""
         shutil.rmtree(self.test_dir)
+
+        if self._prev_operations_dir is None:
+            os.environ.pop("MOJOGOAT_OPERATIONS_DIR", None)
+        else:
+            os.environ["MOJOGOAT_OPERATIONS_DIR"] = self._prev_operations_dir
 
     def test_list_goats_empty(self):
         """Test listing goats when the registry is empty"""
@@ -86,6 +97,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_create_neo4j_goat(self):
         """Test creating a Neo4j goat"""
+        pytest.importorskip("neo4j")
         config_path = os.path.join(self.test_dir, "neo4j_config.json")
         with open(config_path, 'w') as f:
             json.dump({
@@ -685,6 +697,42 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(rels[0]['target_id'], 'b')
         self.assertEqual(rels[0]['story'], 'KNOWS')
 
+    def test_import_relationships_round_trip_preserves_props(self):
+        """dump → import must not drop relationship_id or **props (regression for #16)"""
+        import asyncio
+        import mojogoatapi
+        from mojogoat.goatbases.textgoat import TextGoat
+
+        src_dir = os.path.join(self.test_dir, "src_props_goat")
+        src = TextGoat({"goatpath": src_dir, "goatname": "src"})
+        asyncio.run(src.add_node("a"))
+        asyncio.run(src.add_node("b"))
+        created = asyncio.run(
+            src.create_relationship("a", "b", "KNOWS", smriti_state="confirmed", weight=3)
+        )
+
+        dump_file = os.path.join(self.test_dir, "dump_props.gq")
+        asyncio.run(src.dump_all_rels(dump_file))
+
+        dst_dir = os.path.join(self.test_dir, "dst_props_goat")
+        dst = TextGoat({"goatpath": dst_dir, "goatname": "dst"})
+        mojogoatapi.active_goat = dst
+        mojogoatapi.active_goat_name = "dst"
+
+        r = self.client.post('/api/active-goat/import-relationships', json={"filename": dump_file})
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertEqual(data['imported'], 1)
+        self.assertEqual(data['errors'], [])
+
+        rels = asyncio.run(dst.get_relationships())
+        self.assertEqual(len(rels), 1)
+        self.assertEqual(rels[0]['smriti_state'], 'confirmed')
+        self.assertEqual(rels[0]['weight'], 3)
+        # import-relationships creates a fresh relationship via create_relationship(),
+        # so the destination gets its own goat-scoped ID rather than reusing the source's.
+        self.assertNotEqual(rels[0]['relationship_id'], created['relationship_id'])
+
     def test_import_missing_filename_returns_400(self):
         """POST /api/active-goat/import-relationships without filename returns 400"""
         import mojogoatapi
@@ -707,6 +755,78 @@ class MojoGoatAPITestCase(unittest.TestCase):
         r = self.client.post('/api/active-goat/import-relationships', json={"filename": "/nonexistent/path.gq"})
         self.assertEqual(r.status_code, 400)
         self.assertIn('not found', json.loads(r.data)['error'])
+
+    def test_switching_active_goat_updates_routes_endpoints(self):
+        """POST /api/active-goat must be reflected by routes.py endpoints (regression for #20).
+
+        Goes through the real set_active_goat() path (not a direct `mojogoatapi.active_goat =`
+        assignment, which other tests use as a shortcut) so it actually exercises the
+        routes.set_active_goat_ref() sync that #20's fix added.
+        """
+        goat1 = {
+            "name": "goat_one",
+            "type": "text",
+            "goat_path": os.path.join(self.test_dir, "goat_one"),
+            "make_active": True,
+        }
+        goat2 = {
+            "name": "goat_two",
+            "type": "text",
+            "goat_path": os.path.join(self.test_dir, "goat_two"),
+        }
+        self.assertEqual(self.client.post('/api/goats', json=goat1).status_code, 201)
+        self.assertEqual(self.client.post('/api/goats', json=goat2).status_code, 201)
+
+        self.assertEqual(
+            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_one"}).status_code, 201
+        )
+
+        r = self.client.post('/api/active-goat', json={"name": "goat_two"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(
+            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_two"}).status_code, 201
+        )
+
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        self.assertEqual(nodeids, {"only_in_goat_two"})
+
+        self.client.post('/api/active-goat', json={"name": "goat_one"})
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        self.assertEqual(nodeids, {"only_in_goat_one"})
+
+
+class RoutesActiveGoatIsolationTestCase(unittest.TestCase):
+    """Unit tests for mojogoat.routes.get_active_goat()/check_active_goat() (regression for #20)."""
+
+    def test_get_active_goat_reflects_set_active_goat_ref(self):
+        from mojogoat.routes import get_active_goat, set_active_goat_ref
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        set_active_goat_ref(None)
+        self.assertIsNone(get_active_goat())
+
+        goat = MemoryGoat()
+        set_active_goat_ref(goat)
+        self.assertIs(get_active_goat(), goat)
+
+        set_active_goat_ref(None)
+        self.assertIsNone(get_active_goat())
+
+    def test_check_active_goat_errors_only_when_none(self):
+        from mojogoatapi import app
+        from mojogoat.routes import check_active_goat, set_active_goat_ref
+        from mojogoat.goatbases.memorygoat import MemoryGoat
+
+        with app.app_context():
+            set_active_goat_ref(None)
+            error_response = check_active_goat()
+            self.assertIsNotNone(error_response)
+            self.assertEqual(error_response[1], 404)
+
+            set_active_goat_ref(MemoryGoat())
+            self.assertIsNone(check_active_goat())
+
+            set_active_goat_ref(None)
 
 
 if __name__ == '__main__':

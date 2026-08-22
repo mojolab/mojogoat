@@ -1,8 +1,29 @@
+import json
 from abc import ABC, abstractmethod
 
 # Cypher relationship type constants — shared by all graph backends.
 REL_CONNECTED = "is_connected_to"
 REL_IDENTITY = "is_the_same_as"
+
+# Quad fields returned by get_relationships()/get_relationship() — everything
+# else in the dict is caller-supplied props.
+_QUAD_FIELDS = {"source_id", "story", "target_id", "timestamp", "relationship_id"}
+
+
+def format_dump_line(rel: dict) -> str:
+    """Serialize a relationship dict to the pipe-delimited dump-file format.
+
+    Includes relationship_id and props so dump_all_rels() is a faithful
+    inverse of import-relationships — a round trip must not lose data.
+    """
+    line = (
+        f"{rel['source_id']}|{rel['story']}|{rel['target_id']}|"
+        f"{rel['timestamp']}|{rel['relationship_id']}"
+    )
+    props = {k: v for k, v in rel.items() if k not in _QUAD_FIELDS}
+    if props:
+        line += f"|{json.dumps(props, separators=(',', ':'))}"
+    return line
 
 
 class GoatBase(ABC):

@@ -133,8 +133,9 @@ def _activate(goat, type_name: str) -> None:
 # Global variables for registry (need to be declared before they're used)
 active_goat = None
 active_goat_name = None
-registry_path = None 
+registry_path = None
 registry = {}
+_last_activation_error = None  # set by set_active_goat() on failure, for clearer HTTP error bodies
 
 def initialize_app(registry_file=None):
     """Initialize the application with the registry file"""
@@ -185,21 +186,23 @@ def save_registry():
 
 def set_active_goat(goat_name):
     """Set the active goat"""
-    global active_goat, active_goat_name
-    
+    global active_goat, active_goat_name, _last_activation_error
+
+    _last_activation_error = None
+
     # Find the goat in the registry
     goat_config = None
     for goat in registry.get("goats", []):
         if goat.get("name") == goat_name:
             goat_config = goat
             break
-    
+
     if not goat_config:
         return False
-    
+
     # Initialize the appropriate goat type
     goat_type = goat_config.get("type")
-    
+
     success = False
     try:
         if goat_type == "text":
@@ -225,14 +228,27 @@ def set_active_goat(goat_name):
                 active_goat = Neo4jGoat(goat_config.get("config_path"))
                 success = True
             except ImportError:
-                app.logger.error("Failed to import Neo4jGoat")
+                _last_activation_error = (
+                    "neo4j driver not installed — install the 'neo4j' optional dependency group"
+                )
+                app.logger.error(_last_activation_error)
         else:
-            app.logger.error(f"Unsupported goat type: {goat_type}")
+            _last_activation_error = f"Unsupported goat type: {goat_type}"
+            app.logger.error(_last_activation_error)
     except Exception as e:
-        app.logger.error(f"Failed to set up goat: {str(e)}")
-    
+        _last_activation_error = f"Failed to set up goat: {str(e)}"
+        app.logger.error(_last_activation_error)
+
     if success:
         active_goat_name = goat_name
+        # mojogoat.routes reads the active goat via `import mojogoatapi`, which — since
+        # this script runs as __main__ — resolves to a *separate* module copy of this
+        # file, not this running instance. Push the new goat into that copy too so
+        # routes.py (graph/nodes/relationships/taxonomy/operations-validate) doesn't
+        # stay stuck on whatever goat was active the first time any of its endpoints
+        # ran. See mojolab/mojogoat#20.
+        from mojogoat.routes import set_active_goat_ref
+        set_active_goat_ref(active_goat)
 
     return success
 
@@ -315,6 +331,8 @@ def create_goat():
     # Set as active goat in memory if requested
     if data.get("make_active", False):
         if not set_active_goat(data.get("name")):
+            if _last_activation_error:
+                return jsonify({"error": _last_activation_error}), 400
             return jsonify({"error": "Failed to set as active goat"}), 500
     
     return jsonify({"message": f"Goat '{data.get('name')}' created successfully", "goat": goat_config}), 201
@@ -573,6 +591,8 @@ def set_active_goat_api():
     
     # Set active goat
     if not set_active_goat(data.get("name")):
+        if _last_activation_error:
+            return jsonify({"error": _last_activation_error}), 400
         return jsonify({"error": f"Failed to set '{data.get('name')}' as active goat"}), 500
     
     # Update registry with active goat
@@ -813,6 +833,12 @@ if __name__ == '__main__':
     
     # Initialize the app
     initialize_app()
+
+    # Reload any operations left awaiting validation across a restart (ADR-0014)
+    from mojogoat import operations
+    loaded = operations.load_persisted()
+    if loaded:
+        print(f" * Reloaded {loaded} persisted operation(s)")
 
     # Auto-detect backend if registry didn't provide one
     if active_goat is None:
