@@ -221,10 +221,10 @@ Or a dedicated `POST /api/query` with a goat list in the body.
 **Labels:** documentation
 
 **Goal:**  
-`docs/adr/` has 13 ADRs with no index. A `docs/adr/README.md` listing each ADR by number, title, and one-line summary makes the decision log navigable without reading every file.
+`docs/decisions/` has 13 ADRs with no index. A `docs/decisions/README.md` listing each ADR by number, title, and one-line summary makes the decision log navigable without reading every file.
 
 **Acceptance criteria:**
-- [ ] `docs/adr/README.md` lists ADR-0001 through ADR-0013 (and future ones as added)
+- [ ] `docs/decisions/README.md` lists ADR-0001 through ADR-0013 (and future ones as added)
 - [ ] Each row: number | title | status | one-line summary
 
 ---
