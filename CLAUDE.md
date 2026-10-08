@@ -33,7 +33,7 @@ mojogoat/
 │   │   ├── neo4jgoat.py       ← retired stub (raises ImportError)
 │   │   └── mongogoat/         ← MongoDB+Postgres backend (deferred)
 │   └── __init__.py
-├── test/
+├── tests/
 ├── pyproject.toml
 └── mojogoatapi.py             ← Flask REST API (not used by Xetrapal directly)
 ```
@@ -88,13 +88,13 @@ source | story | target | timestamp | relationship_id | **props
 
 Rules:
 - `relationship_id` is an opaque string generated at write time — treat as opaque, never parse it
-  - TextGoat generates `{goatname}:{10char_base62}` (e.g. `xetrapal:Kj8mNpQr4t`) — see ADR-0006
-  - FalkorGoat/Neo4jGoat/MemoryGoat generate UUID v4 strings — see ADR-0002
+  - TextGoat generates `{goatname}:{10char_base62}` (e.g. `xetrapal:Kj8mNpQr4t`) — see ADR-006
+  - FalkorGoat/Neo4jGoat/MemoryGoat generate UUID v4 strings — see ADR-002
 - `timestamp` is always an ISO-8601 string — never a Python `datetime` object
 - `story` is whatever the caller passes — MojoGOAT is domain-agnostic, never validate it
 - `**props` are stored and returned as-is — MojoGOAT does not interpret them
 - Application flow must never call `delete_relationship` — use `**props` for invalidation
-  (e.g. `smriti_state="invalidated"`). `delete_relationship` exists for admin/test use only — see ADR-0008
+  (e.g. `smriti_state="invalidated"`). `delete_relationship` exists for admin/test use only — see ADR-008
 
 ### Cypher relationship model (for FalkorGoat and Neo4jGoat)
 
@@ -117,8 +117,8 @@ Query by story: `MATCH (a)-[r:is_connected_to]->(b) WHERE 'navigated to' IN r.st
 
 ## Verification Before Done
 
-- Run tests before marking anything complete: `uv run pytest test/`
-- Integration tests require live services — skip by default: `uv run pytest test/ -m "not integration"`
+- Run tests before marking anything complete: `uv run pytest tests/`
+- Integration tests require live services — skip by default: `uv run pytest tests/ -m "not integration"`
 - For any backend change: verify the round-trip — `create_relationship()` → `get_relationships()` → correct data returned
 - For async changes: confirm `await` is used correctly — no sync calls blocking the event loop
 - For new backends: run the same test scenarios as `test_textgoat_async.py`
@@ -161,7 +161,7 @@ needs `claudia` on `PATH`). Enable it with: `git config core.hooksPath .githooks
 - [x] TextGoat — async, UUID v4, ISO-8601, `**props`, full async pytest suite
 - [x] Neo4jGoat (`newneo4jgoatcopilot.py`) — async, UUID v4, ISO-8601, `**props`
 - [x] `neo4jgoat.py` (py2neo) — retired, raises `ImportError`
-- [x] Neo4jGoat async pytest suite — `test/test_newneo4jgoatcopilot.py` (skipped gracefully when `neo4j` not installed)
+- [x] Neo4jGoat async pytest suite — `tests/test_newneo4jgoatcopilot.py` (skipped gracefully when `neo4j` not installed)
 - [ ] MongogoatModels — deferred
 - [x] FalkorDB backend — `falkorgoat.py`, 25 unit + 3 integration tests
 

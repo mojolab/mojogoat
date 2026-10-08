@@ -1,4 +1,4 @@
-"""Tests for the operations.py persistence addition (ADR-0014): operations
+"""Tests for the operations.py persistence addition (ADR-014): operations
 survive a process restart by being write-through cached to disk under
 MOJOGOAT_OPERATIONS_DIR, and reloaded via load_persisted()."""
 import os

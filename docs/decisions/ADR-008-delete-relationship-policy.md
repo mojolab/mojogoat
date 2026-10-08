@@ -1,4 +1,4 @@
-# ADR-0008: `delete_relationship` is retained as an administrative capability
+# ADR-008: `delete_relationship` is retained as an administrative capability
 
 **Status:** Accepted
 **Date:** 2026-02-24

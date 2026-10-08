@@ -1,15 +1,15 @@
-# ADR-0014: Persist Operations to Disk
+# ADR-014: Persist Operations to Disk
 
 **Date:** 2026-07-26
 **Status:** Accepted
 
 ## Context
 
-ADR-0012 introduced the Operations API and accepted in-memory-only storage as fine for the
+ADR-012 introduced the Operations API and accepted in-memory-only storage as fine for the
 interactive workbench use case, noting: *"A future version could persist operations to the quad
 store as a special story type if durability is needed."*
 
-In practice, external processes that propose operations (any caller following the ADR-0012
+In practice, external processes that propose operations (any caller following the ADR-012
 "external process" contract) may leave an operation `awaiting_validation` for a while before a
 human reviews it — a server restart in that window silently loses the proposed changes with no
 way to recover them.
@@ -30,14 +30,14 @@ process startup:
   clobbers state that's already been recreated since startup.
 
 This does not change the Operations API's contract, response shapes, or the "operations are opaque
-to MojoGOAT" principle from ADR-0012 — it only makes the existing in-memory state durable.
+to MojoGOAT" principle from ADR-012 — it only makes the existing in-memory state durable.
 
 ## Consequences
 
 - Small amount of additional disk I/O per operation mutation, scoped to `/xpal-data` (this
   deployment's local/session data directory, not committed to the repo).
 - Tests that exercise the Operations API must isolate `MOJOGOAT_OPERATIONS_DIR` to a temp
-  directory (see `test/test_api.py`'s `setUp`/`tearDown`) so they don't write into the real
+  directory (see `tests/test_api.py`'s `setUp`/`tearDown`) so they don't write into the real
   `/xpal-data/run/operations/` — mirroring how the same tests already isolate the registry file.
-- `test/test_operations_persistence.py` covers create/post/validate/delete persisting correctly,
+- `tests/test_operations_persistence.py` covers create/post/validate/delete persisting correctly,
   and reloading after a simulated restart.

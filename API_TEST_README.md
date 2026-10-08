@@ -69,7 +69,7 @@ Options:
 
 ### Unit Tests
 
-Located in `/xpal-src/mojogoat/test/`:
+Located in `/xpal-src/mojogoat/tests/`:
 
 - `test_api.py` - Tests for goat management API endpoints
 - `test_api_crud.py` - Tests for CRUD operations API endpoints
@@ -133,7 +133,7 @@ The Postman collection (`MojoGOAT_API_Tests.postman_collection.json`) contains o
 
 ## MongoDB+PostgreSQL Tests
 
-Located in `/xpal-src/mojogoat/test/`:
+Located in `/xpal-src/mojogoat/tests/`:
 
 - `test_mongodbpostgres_nodes.py` - Tests for node operations
 - `test_mongodbpostgres_relationships.py` - Tests for relationship operations

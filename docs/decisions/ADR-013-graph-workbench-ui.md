@@ -1,4 +1,4 @@
-# ADR-0013: Graph Workbench UI
+# ADR-013: Graph Workbench UI
 
 **Date:** 2026-03-15
 **Status:** Accepted
@@ -37,7 +37,7 @@ access beyond what the API exposes.
 
 Cytoscape.js is chosen over Sigma.js/graphology because:
 - Its selection model (`cy.elements(':selected')`) maps directly to the operation
-  dispatch pattern in ADR-0012
+  dispatch pattern in ADR-012
 - It has the richest set of maintained layout algorithm plugins
 - It handles compound nodes, which may be useful for grouping by label or story type
 
@@ -55,13 +55,13 @@ Cytoscape.js is chosen over Sigma.js/graphology because:
 ### MojoGOAT API surface required
 
 The workbench consumes:
-- `GET /api/graph` (ADR-0011) — primary data load and filter
+- `GET /api/graph` (ADR-011) — primary data load and filter
 - `GET /api/active-goat/taxonomy` — for story colour coding
-- `POST /api/operations` + `GET/POST /api/operations/<id>/*` (ADR-0012) — operations
+- `POST /api/operations` + `GET/POST /api/operations/<id>/*` (ADR-012) — operations
 - `PATCH /api/relationships/<id>` — direct prop edits from the inspector
 - `POST /api/nodes`, `POST /api/relationships` — create from workbench
 
-No new API endpoints are required beyond ADR-0011 and ADR-0012.
+No new API endpoints are required beyond ADR-011 and ADR-012.
 
 ## Consequences
 

@@ -1,4 +1,4 @@
-# ADR-0003: FalkorDB as the Phase 1 graph backend for Xetrapal
+# ADR-003: FalkorDB as the Phase 1 graph backend for Xetrapal
 
 Date: 2026-02-23
 Status: Accepted
@@ -39,7 +39,7 @@ Neo4jGoat remains available and unchanged for production deployments.
 
 - Xetrapal Phase 1 can develop against FalkorDB without running a full Neo4j
   instance.
-- Because both backends use the same two-type Cypher model (ADR-0004), switching
+- Because both backends use the same two-type Cypher model (ADR-004), switching
   from FalkorDB to Neo4j in production is a constructor swap, not a code change.
 - FalkorDB's Python async client wraps synchronous operations internally; if a
   native async client becomes available it can be adopted transparently.

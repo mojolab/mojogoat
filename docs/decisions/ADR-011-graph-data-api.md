@@ -1,4 +1,4 @@
-# ADR-0011: Graph Data API
+# ADR-011: Graph Data API
 
 **Date:** 2026-03-15
 **Status:** Accepted
@@ -9,7 +9,7 @@ All existing REST endpoints operate on quads (source, story, target, timestamp) 
 individually. There is no endpoint that returns the full graph structure in a format
 suitable for visualisation or graph algorithm consumption.
 
-The MojoGOAT workbench (ADR-0013) and any external graph tool need a single endpoint
+The MojoGOAT workbench (ADR-013) and any external graph tool need a single endpoint
 that returns the active goat's data as a property graph (nodes + edges) with optional
 filters. This endpoint is backend-agnostic — it assembles the response from the existing
 `get_nodes()` and `get_relationships()` interface methods.
@@ -67,4 +67,4 @@ This prevents unbounded payloads when a goat has many isolated nodes.
 - No new backend interface methods are required.
 - A future `GET /api/graph/export/gexf` can be added alongside this endpoint without
   changing the data model.
-- The workbench (ADR-0013) uses this endpoint as its primary data source.
+- The workbench (ADR-013) uses this endpoint as its primary data source.

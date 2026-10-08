@@ -9,7 +9,7 @@ _store: dict[str, dict] = {}
 
 def _operations_dir() -> str:
     """Directory operations are persisted to, so an awaiting-validation
-    proposal survives a server restart (see docs/decisions/0014). Read fresh from
+    proposal survives a server restart (see docs/decisions/ADR-014). Read fresh from
     the environment on each call (not cached) so tests can override it."""
     return os.environ.get("MOJOGOAT_OPERATIONS_DIR", "/xpal-data/run/operations")
 

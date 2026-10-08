@@ -1,4 +1,4 @@
-# ADR-0004: Two Cypher relationship types with a `stories` list property
+# ADR-004: Two Cypher relationship types with a `stories` list property
 
 Date: 2026-02-23
 Status: Accepted

@@ -196,5 +196,5 @@ Body:
 
 To run the API tests:
 ```bash
-python3 test/run_api_tests.py
+python3 tests/run_api_tests.py
 ```

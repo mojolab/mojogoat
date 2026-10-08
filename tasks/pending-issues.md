@@ -69,7 +69,7 @@ Drop-in replacement implementing the same async interface as `textgoat.py` and `
 - [ ] `mojogoat/goatbases/mongogoat/` implementation complete
 - [ ] Same test scenarios as `test_textgoat_async.py` pass against a live Mongo instance
 - [ ] Integration tests gated with `@pytest.mark.integration`
-- [ ] ADR-0014 written documenting the storage schema
+- [ ] ADR-014 written documenting the storage schema
 
 **Blocked by:** ISSUE-2 (v0.3.0 stable baseline)
 
@@ -105,7 +105,7 @@ Generated via `flask-smorest` or hand-authored YAML — whichever creates less m
 **Repo:** mojogoat-ui (file there, not here)
 
 **Goal:**  
-The mojogoat-ui workbench was scaffolded in v0.3.0 (Item 17, ADR-0013). The Operations panel and validation queue need to poll `GET /api/operations/<id>` and call `POST /api/operations/<id>/validate`. Currently the panel is likely a stub.
+The mojogoat-ui workbench was scaffolded in v0.3.0 (Item 17, ADR-013). The Operations panel and validation queue need to poll `GET /api/operations/<id>` and call `POST /api/operations/<id>/validate`. Currently the panel is likely a stub.
 
 **Acceptance criteria:**
 - [ ] Operations panel lists all pending operations from `GET /api/operations`
@@ -124,7 +124,7 @@ The mojogoat-ui workbench was scaffolded in v0.3.0 (Item 17, ADR-0013). The Oper
 **Repo:** mojogoat-ui (file there, not here)
 
 **Goal:**  
-`GET /api/graph` supports `source`, `target`, `story`, `limit`, `node_ids` filters (ADR-0011). The filter bar in the workbench should drive these query params and re-render the canvas on change.
+`GET /api/graph` supports `source`, `target`, `story`, `limit`, `node_ids` filters (ADR-011). The filter bar in the workbench should drive these query params and re-render the canvas on change.
 
 **Acceptance criteria:**
 - [ ] Filter bar fields map 1:1 to `/api/graph` query params
@@ -189,7 +189,7 @@ The mojogoat-ui polls `GET /api/operations` on a timer. SSE would let the server
 **Acceptance criteria:**
 - [ ] SSE endpoint emits `data: {id, status, updated_at}` on each state transition
 - [ ] mojogoat-ui switches from polling to SSE with polling as fallback
-- [ ] ADR-0015 written
+- [ ] ADR-015 written
 
 **Blocked by:** ISSUE-5 (polling must work first)
 
@@ -224,7 +224,7 @@ Or a dedicated `POST /api/query` with a goat list in the body.
 `docs/decisions/` has 13 ADRs with no index. A `docs/decisions/README.md` listing each ADR by number, title, and one-line summary makes the decision log navigable without reading every file.
 
 **Acceptance criteria:**
-- [ ] `docs/decisions/README.md` lists ADR-0001 through ADR-0013 (and future ones as added)
+- [ ] `docs/decisions/README.md` lists ADR-001 through ADR-013 (and future ones as added)
 - [ ] Each row: number | title | status | one-line summary
 
 ---

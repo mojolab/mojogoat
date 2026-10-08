@@ -1,4 +1,4 @@
-# ADR-0007: TextGoat snapshot file lifecycle — no automatic compaction
+# ADR-007: TextGoat snapshot file lifecycle — no automatic compaction
 
 **Status:** Accepted (compaction deferred)
 **Date:** 2026-02-24

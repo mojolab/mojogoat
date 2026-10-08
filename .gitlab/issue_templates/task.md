@@ -16,12 +16,12 @@ labels: task
 
 - [ ] 
 - [ ] 
-- [ ] `uv run pytest test/ -m "not integration"` green
+- [ ] `uv run pytest tests/ -m "not integration"` green
 
 ## Files expected to change
 
 - `mojogoat/`
-- `test/`
+- `tests/`
 
 ## Blocked by
 

@@ -1,4 +1,4 @@
-# ADR-0009: One story per `create_relationship` call; multi-story storage is internal only
+# ADR-009: One story per `create_relationship` call; multi-story storage is internal only
 
 **Status:** Accepted
 **Date:** 2026-02-24
@@ -7,7 +7,7 @@
 
 ## Context
 
-ADR-0004 introduced a `stories` list property on Cypher edges to allow future multi-story
+ADR-004 introduced a `stories` list property on Cypher edges to allow future multi-story
 relationships. The property is an array even for single-story relationships:
 `stories: ["navigated to"]`.
 

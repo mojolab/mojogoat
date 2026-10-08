@@ -1,4 +1,4 @@
-# ADR-0005: `**props` passthrough on `create_relationship` and `update_relationship_props`
+# ADR-005: `**props` passthrough on `create_relationship` and `update_relationship_props`
 
 Date: 2026-02-23
 Status: Accepted

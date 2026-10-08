@@ -112,7 +112,7 @@ async def _select_backend(requested_type: str, config: dict):
 
     if requested_type == 'auto':
         # Auto mode uses only local backends — Neo4j and FalkorDB require
-        # explicit configuration and are never probed automatically (ADR-0010).
+        # explicit configuration and are never probed automatically (ADR-010).
         try:
             goat = _make_textgoat(config)
             return goat, 'text'
@@ -662,8 +662,8 @@ def get_status():
     backends = {
         "text":     {"available": True,                    "description": "File-based flat-file backend"},
         "memory":   {"available": True,                    "description": "In-memory backend (no persistence, resets on restart)"},
-        "neo4j":    {"available": _can_import("neo4j"),    "description": "Neo4j graph database — recommended production backend (ADR-0010)"},
-        "falkordb": {"available": _can_import("falkordb"), "description": "FalkorDB graph database — opt-in, Redis-native deployments only (ADR-0010)"},
+        "neo4j":    {"available": _can_import("neo4j"),    "description": "Neo4j graph database — recommended production backend (ADR-010)"},
+        "falkordb": {"available": _can_import("falkordb"), "description": "FalkorDB graph database — opt-in, Redis-native deployments only (ADR-010)"},
     }
 
     active_info = None
@@ -716,14 +716,14 @@ def get_status():
         {"method": "GET",    "path": "/api/active-goat/composition",        "description": "Node count grouped by label"},
         {"method": "GET",    "path": "/api/active-goat/taxonomy",           "description": "Relationship count grouped by story"},
         {"method": "POST",   "path": "/api/active-goat/dump-relationships", "description": "Dump all relationships to a file (body: {filename})"},
-        {"method": "POST",   "path": "/api/active-goat/compact",            "description": "Compact TextGoat snapshots — rewrite current state, delete orphaned snapshots (ADR-0007)"},
+        {"method": "POST",   "path": "/api/active-goat/compact",            "description": "Compact TextGoat snapshots — rewrite current state, delete orphaned snapshots (ADR-007)"},
         {"method": "POST",   "path": "/api/active-goat/import-relationships","description": "Bulk import from a pipe-delimited quad file (body: {filename}) — returns {imported, skipped, errors}"},
-        {"method": "GET",    "path": "/api/graph",                          "description": "Graph data — {nodes, edges, node_count, edge_count}; filters: source, target, story, limit, node_ids (ADR-0011)"},
-        {"method": "POST",   "path": "/api/operations",                     "description": "Create an operation (body: {name, node_ids, params}) (ADR-0012)"},
-        {"method": "GET",    "path": "/api/operations/<id>",                "description": "Get operation status and results (ADR-0012)"},
-        {"method": "POST",   "path": "/api/operations/<id>/results",        "description": "External process posts proposed changes (ADR-0012)"},
-        {"method": "POST",   "path": "/api/operations/<id>/validate",       "description": "Accept or reject individual results (body: {result_id, action}) (ADR-0012)"},
-        {"method": "DELETE", "path": "/api/operations/<id>",                "description": "Cancel and discard an operation (ADR-0012)"},
+        {"method": "GET",    "path": "/api/graph",                          "description": "Graph data — {nodes, edges, node_count, edge_count}; filters: source, target, story, limit, node_ids (ADR-011)"},
+        {"method": "POST",   "path": "/api/operations",                     "description": "Create an operation (body: {name, node_ids, params}) (ADR-012)"},
+        {"method": "GET",    "path": "/api/operations/<id>",                "description": "Get operation status and results (ADR-012)"},
+        {"method": "POST",   "path": "/api/operations/<id>/results",        "description": "External process posts proposed changes (ADR-012)"},
+        {"method": "POST",   "path": "/api/operations/<id>/validate",       "description": "Accept or reject individual results (body: {result_id, action}) (ADR-012)"},
+        {"method": "DELETE", "path": "/api/operations/<id>",                "description": "Cancel and discard an operation (ADR-012)"},
     ]
 
     return jsonify({
@@ -783,7 +783,7 @@ async def set_backend():
       goat_path   — Text backend data directory
       goat_name   — Text backend name                 (default: default)
 
-    Auto mode tries text → memory. Neo4j and FalkorDB require explicit configuration (ADR-0010).
+    Auto mode tries text → memory. Neo4j and FalkorDB require explicit configuration (ADR-010).
     """
     data = request.json or {}
     requested_type = data.get('type', 'auto')
@@ -834,7 +834,7 @@ if __name__ == '__main__':
     # Initialize the app
     initialize_app()
 
-    # Reload any operations left awaiting validation across a restart (ADR-0014)
+    # Reload any operations left awaiting validation across a restart (ADR-014)
     from mojogoat import operations
     loaded = operations.load_persisted()
     if loaded:

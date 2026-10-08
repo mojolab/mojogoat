@@ -14,19 +14,19 @@ All items (11–17) implemented and tested as of 2026-06-11. Suite green: 148 pa
 
 | Item | Description | Status |
 |------|-------------|--------|
-| 11 | Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-0010) | done |
-| 12 | `GET /api/graph` endpoint (ADR-0011) | done |
-| 13 | Operations API (ADR-0012) | done |
-| 14 | TextGoat snapshot compaction (ADR-0007) | done |
+| 11 | Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-010) | done |
+| 12 | `GET /api/graph` endpoint (ADR-011) | done |
+| 13 | Operations API (ADR-012) | done |
+| 14 | TextGoat snapshot compaction (ADR-007) | done |
 | 15 | Bulk import (inverse of dump) | done |
 | 16 | API test coverage gaps | done |
-| 17 | Graph workbench UI (ADR-0013, separate repo) | done |
+| 17 | Graph workbench UI (ADR-013, separate repo) | done |
 
 ---
 
 # v0.3.0 Plan (reference)
 
-## Item 11 — Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-0010)
+## Item 11 — Backend hierarchy: Neo4j primary, FalkorDB opt-in (ADR-010)
 
 Remove FalkorDB from `auto` backend selection. Auto order becomes `text → memory` only.
 Neo4j and FalkorDB both require explicit `type:` configuration.
@@ -36,7 +36,7 @@ Neo4j and FalkorDB both require explicit `type:` configuration.
 
 ---
 
-## Item 12 — `GET /api/graph` endpoint (ADR-0011)
+## Item 12 — `GET /api/graph` endpoint (ADR-011)
 
 Returns `{nodes, edges, node_count, edge_count}` from the active goat.
 Filters: `source`, `target`, `story`, `limit`, `node_ids` (comma-separated), extra params → props filter.
@@ -47,7 +47,7 @@ Node inclusion rule: only nodes referenced by at least one returned edge (or exp
 
 ---
 
-## Item 13 — Operations API (ADR-0012)
+## Item 13 — Operations API (ADR-012)
 
 In-memory operation store on the API process. Endpoints:
 - `POST   /api/operations`
@@ -64,7 +64,7 @@ Accepted results are written to the active goat via normal create/update calls.
 
 ---
 
-## Item 14 — TextGoat snapshot compaction (ADR-0007)
+## Item 14 — TextGoat snapshot compaction (ADR-007)
 
 TextGoat appends to flat files unboundedly. Implement compaction: rewrite the current
 state to a new snapshot file, archive the old append log.
@@ -96,7 +96,7 @@ Missing tests in `test_api.py`:
 
 ---
 
-## Item 17 — Graph workbench UI (ADR-0013)
+## Item 17 — Graph workbench UI (ADR-013)
 
 Separate repository (`mojogoat-ui`). React + Cytoscape.js. Pure API consumer.
 

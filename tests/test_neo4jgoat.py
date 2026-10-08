@@ -2,9 +2,9 @@
 
 Unit tests mock the neo4j driver session — no live Neo4j required.
 Integration tests are marked @pytest.mark.integration and skipped by default:
-    python3 -m pytest test/ -m "not integration"
+    python3 -m pytest tests/ -m "not integration"
 
-Integration tests require a JSON config file at test/testdata/neo4j_test_config.json:
+Integration tests require a JSON config file at tests/testdata/neo4j_test_config.json:
     {"url": "bolt://localhost:7687", "database": "neo4j", "password": "your_password"}
 """
 import os
@@ -389,7 +389,7 @@ async def test_dump_all_rels(goat, mock_session, tmp_path):
 
 # ---------------------------------------------------------------------------
 # Integration tests — require a live Neo4j instance
-# Config: test/testdata/neo4j_test_config.json
+# Config: tests/testdata/neo4j_test_config.json
 #   {"url": "bolt://localhost:7687", "database": "neo4j", "password": "your_password"}
 # ---------------------------------------------------------------------------
 

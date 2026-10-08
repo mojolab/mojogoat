@@ -35,7 +35,7 @@ packages = ["mojogoat"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["test"]
+testpaths = ["tests"]
 markers = [
     "integration: requires live external services — deselect with '-m not integration'",
 ]

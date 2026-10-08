@@ -1,4 +1,4 @@
-# ADR-0001: Async-first backend interface
+# ADR-001: Async-first backend interface
 
 Date: 2026-02-23
 Status: Accepted

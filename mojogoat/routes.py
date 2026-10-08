@@ -247,7 +247,7 @@ def register_routes(app):
             return jsonify({"error": f"Failed to dump relationships: {str(e)}"}), 500
 
     # ------------------------------------------------------------------
-    # Item 14 — TextGoat snapshot compaction (ADR-0007)
+    # Item 14 — TextGoat snapshot compaction (ADR-007)
     # ------------------------------------------------------------------
 
     @app.route('/api/active-goat/compact', methods=['POST'])
@@ -319,7 +319,7 @@ def register_routes(app):
         return jsonify({'imported': imported, 'skipped': skipped, 'errors': errors}), 200
 
     # ------------------------------------------------------------------
-    # Item 12 — Graph data API (ADR-0011)
+    # Item 12 — Graph data API (ADR-011)
     # ------------------------------------------------------------------
 
     @app.route('/api/graph', methods=['GET'])
@@ -367,7 +367,7 @@ def register_routes(app):
             return jsonify({'error': f'Failed to get graph: {str(e)}'}), 500
 
     # ------------------------------------------------------------------
-    # Item 13 — Operations API (ADR-0012)
+    # Item 13 — Operations API (ADR-012)
     # ------------------------------------------------------------------
 
     @app.route('/api/operations', methods=['POST'])

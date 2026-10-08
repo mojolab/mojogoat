@@ -1,4 +1,4 @@
-# ADR-0002: UUID v4 relationship IDs generated at write time
+# ADR-002: UUID v4 relationship IDs generated at write time
 
 Date: 2026-02-23
 Status: Accepted

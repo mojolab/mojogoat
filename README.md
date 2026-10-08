@@ -174,11 +174,11 @@ MojoGOAT includes a comprehensive testing framework to validate its functionalit
 
 1. **API Unit Tests**
    - Python unittest framework for API endpoint testing
-   - Located in `/test/test_api.py` and `/test/test_api_crud.py`
+   - Located in `tests/test_api.py` and `tests/test_api_crud.py`
 
 2. **CLI Test Tool**
    - Command-line tool for testing all API endpoints
-   - Located in `/test/test_api_cli.py`
+   - Located in `tests/test_api_cli.py`
 
 3. **Postman Collection**
    - GUI-based API testing using Postman
@@ -186,7 +186,7 @@ MojoGOAT includes a comprehensive testing framework to validate its functionalit
 
 4. **MongoDB+PostgreSQL Tests**
    - Validate the hybrid database functionality
-   - Located in `/test/test_mongodbpostgres_*.py`
+   - Located in `tests/test_mongodbpostgres_*.py`
 
 To run all tests:
 

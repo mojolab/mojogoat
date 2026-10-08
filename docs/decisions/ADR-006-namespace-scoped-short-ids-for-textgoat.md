@@ -1,14 +1,14 @@
-# ADR-0006: Namespace-scoped short IDs for TextGoat relationship_ids
+# ADR-006: Namespace-scoped short IDs for TextGoat relationship_ids
 
 **Status:** Accepted
 **Date:** 2026-02-24
-**Supersedes:** ADR-0002 (for the TextGoat backend only)
+**Supersedes:** ADR-002 (for the TextGoat backend only)
 
 ---
 
 ## Context
 
-ADR-0002 established `str(uuid4())` as the `relationship_id` format across all backends.
+ADR-002 established `str(uuid4())` as the `relationship_id` format across all backends.
 This was revisited when multi-goat namespacing was introduced: each goat now stores its
 data in its own subdirectory (`DEFAULT_DATA_DIR/{goat_name}/`), making it useful for
 relationship IDs to carry the namespace they belong to.
@@ -33,7 +33,7 @@ stored data.
 - 10 characters → ~59 bits of entropy; collision probability < 1 in 10^12 for 1M relationships
 - The goat name prefix makes IDs self-identifying in log files, exports, and cross-goat dumps
 
-**FalkorGoat and Neo4jGoat** continue to use `str(uuid4())` (ADR-0002 unchanged for those
+**FalkorGoat and Neo4jGoat** continue to use `str(uuid4())` (ADR-002 unchanged for those
 backends).
 
 **MemoryGoat** continues to use `str(uuid4())` — it is a stateless testing/fallback
@@ -53,7 +53,7 @@ the relationship is updated (at which point the original ID is preserved in `par
 - **Positive:** Shorter IDs improve readability in logs and debug output.
 - **Negative:** `relationship_id` format now differs between TextGoat and graph backends;
   callers must not assume UUID format.
-- **Negative:** ADR-0002's "always UUID v4" invariant is relaxed to "unique string, opaque
+- **Negative:** ADR-002's "always UUID v4" invariant is relaxed to "unique string, opaque
   to MojoGOAT, generated at write time". Tests that assert `len(id) == 36` must be updated.
 - **Rule:** Never parse or compare the internal structure of a `relationship_id` — treat it
   as an opaque string.

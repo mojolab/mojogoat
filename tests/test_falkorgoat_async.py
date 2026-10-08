@@ -2,7 +2,7 @@
 
 Unit tests mock _graph.query so no live FalkorDB is required.
 Integration tests are marked @pytest.mark.integration and skipped by default:
-    uv run pytest test/ -m "not integration"
+    uv run pytest tests/ -m "not integration"
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock

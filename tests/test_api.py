@@ -32,7 +32,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         # Create a temporary registry file
         self.registry_file = os.path.join(self.test_dir, "test_registry.json")
 
-        # Keep operations.py's persistence (ADR-0014) out of the real /xpal-data
+        # Keep operations.py's persistence (ADR-014) out of the real /xpal-data
         self._prev_operations_dir = os.environ.get("MOJOGOAT_OPERATIONS_DIR")
         os.environ["MOJOGOAT_OPERATIONS_DIR"] = os.path.join(self.test_dir, "operations")
 
@@ -384,7 +384,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertIn('KNOWS', data['taxonomy'])
 
     def test_post_backend_auto_excludes_falkordb_neo4j(self):
-        """POST /api/backend with type=auto never probes FalkorDB or Neo4j (ADR-0010)"""
+        """POST /api/backend with type=auto never probes FalkorDB or Neo4j (ADR-010)"""
         r = self.client.post('/api/backend', json={
             "type": "auto",
             "goat_path": os.path.join(self.test_dir, "auto_goat"),
@@ -396,7 +396,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertNotIn(data['type'], ('falkordb', 'neo4j'))
 
     # ------------------------------------------------------------------
-    # Item 12 — GET /api/graph (ADR-0011)
+    # Item 12 — GET /api/graph (ADR-011)
     # ------------------------------------------------------------------
 
     def test_get_graph_basic(self):
@@ -477,7 +477,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(r.status_code, 404)
 
     # ------------------------------------------------------------------
-    # Item 13 — Operations API (ADR-0012)
+    # Item 13 — Operations API (ADR-012)
     # ------------------------------------------------------------------
 
     def _setup_memory_goat(self):
@@ -617,7 +617,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(r.status_code, 400)
 
     # ------------------------------------------------------------------
-    # Item 14 — TextGoat compaction (ADR-0007)
+    # Item 14 — TextGoat compaction (ADR-007)
     # ------------------------------------------------------------------
 
     def test_compact_textgoat_preserves_rels_and_removes_old_snapshots(self):

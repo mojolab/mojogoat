@@ -1,4 +1,4 @@
-# ADR-0010: Backend Hierarchy — Neo4j Primary, FalkorDB Opt-In
+# ADR-010: Backend Hierarchy — Neo4j Primary, FalkorDB Opt-In
 
 **Date:** 2026-03-15
 **Status:** Accepted

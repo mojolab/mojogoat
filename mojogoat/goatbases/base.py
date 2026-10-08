@@ -74,7 +74,7 @@ class GoatBase(ABC):
 
         WARNING: Do not call this in normal application flow. Use update_relationship_props()
         to mark relationships as invalid via **props (e.g. state='invalidated'). This method
-        exists for administrative correction and test teardown only. See ADR-0008.
+        exists for administrative correction and test teardown only. See ADR-008.
         """
         ...
 

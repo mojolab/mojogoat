@@ -1,11 +1,11 @@
-# ADR-0012: Graph Operations API
+# ADR-012: Graph Operations API
 
 **Date:** 2026-03-15
 **Status:** Accepted
 
 ## Context
 
-The MojoGOAT workbench (ADR-0013) needs to support user-initiated graph operations such
+The MojoGOAT workbench (ADR-013) needs to support user-initiated graph operations such
 as label propagation, where:
 
 1. The user selects a set of nodes in the UI.
