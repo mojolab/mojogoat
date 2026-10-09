@@ -1,0 +1,9 @@
+AIProject|LINKED_TO|MLInitiative|is the same as
+janedoe|LINKED_TO|healthorg|works at
+janedoe|LINKED_TO|researchteam|is a member of
+researchteam|LINKED_TO|innovationhub|reports to
+michaelbrown|LINKED_TO|innovationhub|leads
+michaelbrown|LINKED_TO|genomics|works on
+johnsmith|LINKED_TO|AIProject|works on
+johnsmith|LINKED_TO|researchteam|leads
+johnsmith|LINKED_TO|techcorp|works at

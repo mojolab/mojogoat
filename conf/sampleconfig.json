@@ -1,24 +1,12 @@
 {
-    "goatpen":"#ROOT WHERE GOATS LIVE",
-    "goatlog":"goat.log",
-    "goatlist":[
-        {
-        "goatpath": "#THISGOAT",
-        "goatname": "testgoat1",
-        "goatdesc": "test goat1"
+  "goatpen": "/xpal-data/goats",
+  "goatlog": "goat.log",
+  "goatlist": [
+    {
+      "goatpath": "/xpal-data/goats/caregoat",
+      "goatname": "caregoat",
+      "goatdesc": "CareGram Goat"
 
-        },
-        {
-            "goatpath": "#THATGOAT",
-            "goatname": "testgoat2",
-            "goatdesc": "test goat2"
-
-        },
-        {
-            "goatpath": "#ANOTHER GOAT",
-            "goatname": "anothergoat",
-            "goatdesc": "Another Goat"
-
-        }
-    ]
+    }
+  ]
 }

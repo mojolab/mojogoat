@@ -1,5 +1,5 @@
 import os,json,re
-from .goat import Goat
+from .goatbases import TextGoat
 
 def read_herd_config(herdpath):
     with open(herdpath,'r') as f:
@@ -13,7 +13,8 @@ def get_goats(herd_config):
         goats.append(Goat(goat))
     return goats
 
+
 def get_nodeid(node):
-    nodeid=node.replace(" ","")
-    nodeid=re.sub('[^A-Za-z0-9]+', '', nodeid).lower()
+    nodeid = node.replace(" ", "")
+    nodeid = re.sub('[^A-Za-z0-9]+', '', nodeid).lower()
     return nodeid

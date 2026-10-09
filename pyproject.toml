@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mojogoat"
+version = "0.2.0"
+description = "Graph of All Things — a multi-backend quad store engine"
+requires-python = ">=3.11"
+dependencies = [
+    # Web / API layer (Flask REST server)
+    "flask>=3.0",
+    "flask-cors>=4.0",
+    # Async support
+    "aiofiles>=23.0",
+    "asgiref>=3.7",
+]
+
+[project.optional-dependencies]
+falkordb = [
+    "falkordb>=1.0",
+]
+neo4j = [
+    "neo4j>=5.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "mypy>=1.10",
+    "requests>=2.31",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["mojogoat"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "integration: requires live external services — deselect with '-m not integration'",
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true

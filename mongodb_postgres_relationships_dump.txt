@@ -1,0 +1,9 @@
+johnsmith|works at|techcorp|2025-05-03 18:28:48.764309
+johnsmith|works on|AIProject|2025-05-03 18:28:48.780889
+AIProject|is the same as|MLInitiative|2025-05-03 18:28:48.797438
+janedoe|works at|healthorg|2025-05-03 18:28:48.813366
+janedoe|is a member of|researchteam|2025-05-03 18:28:48.824513
+johnsmith|leads|researchteam|2025-05-03 18:28:48.837439
+researchteam|reports to|innovationhub|2025-05-03 18:28:48.852249
+michaelbrown|leads|innovationhub|2025-05-03 18:28:48.862116
+michaelbrown|works on|genomics|2025-05-03 18:28:48.877298

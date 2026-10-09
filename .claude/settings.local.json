@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.falkordb.com)",
+      "WebSearch",
+      "Bash(git diff -w HEAD -- mojogoat/goatbases/newneo4jgoatcopilot.py | head -40)",
+      "Bash(git diff -w HEAD -- tasks/lessons.md)",
+      "Bash(uv sync 2>&1)",
+      "Bash(uv run pytest tests/ -m \"not integration\" -q 2>&1)",
+      "Bash(sleep 3 && curl -s http://localhost:5000/health 2>&1)",
+      "Bash(sleep 2 && curl -s http://localhost:5000/health)",
+      "Bash(curl -s http://localhost:5000/health)",
+      "Bash(uv run:*)",
+      "Bash(git add:*)",
+      "Bash(git config:*)",
+      "Bash(awk '/## Item 15/{f=1} f{print} /## Item 15/{c=1} c&&/^---$/{exit}' tasks/todo.md)",
+      "Bash(git commit -m ' *)",
+      "Bash(gh repo *)",
+      "Bash(glab auth *)",
+      "Bash(curl -sL https://github.com/cli/cli/releases/latest)",
+      "Bash(apt-cache search *)"
+    ]
+  }
+}
