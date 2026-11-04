@@ -204,7 +204,7 @@ The mojogoat-ui polls `GET /api/operations` on a timer. SSE would let the server
 **Labels:** enhancement, future
 
 **What and why:**  
-All queries are scoped to the active goat. Some use cases (e.g. Xetrapal cross-graph reasoning) need to join relationships across two goats without switching the active goat.
+All queries are scoped to a single goat (to the active goat today; to the goat in the URL after ADR-016 / ISSUE-18, which removes the active goat). Some use cases (e.g. Xetrapal cross-graph reasoning) need to join relationships across two goats in one call. After ADR-016 a client can already make two scoped calls and merge them; this issue is about a server-side merged query.
 
 **Proposed interface:**  
 `GET /api/graph?goats=goat1,goat2` — returns merged nodes/edges from multiple goats.  
@@ -229,6 +229,104 @@ Or a dedicated `POST /api/query` with a goat list in the body.
 
 ---
 
+## Goat-scoped API (ADR-016) — added 2026-10-31
+
+Numbered from 18 because ISSUE-12..17 are already used on the unmerged branch
+`docs/adr-0015-and-samples`.
+
+---
+
+### ISSUE-18 · [feature] Goat-scoped API; remove the active goat
+
+**Labels:** feature, breaking, api
+**Milestone:** v0.4.0
+
+**Goal:**
+Implement ADR-016. All data routes live under `/api/goats/<goat>/…`; `/api/active-goat*`,
+`/api/backend`, `/api/direct/nodes`, `/api/debug` and the unscoped data routes are removed
+(410 stubs this release).
+
+**Acceptance criteria:**
+- [ ] Routes and behaviour match `docs/api-v2-goat-scoped.md`
+- [ ] No module-level `active_goat`; `routes.py` receives a resolver via `init_routes`
+- [ ] `/api/status` reports `api_version: 2`
+- [ ] Operations are scoped per goat
+- [ ] Goat names validated (ADR-016 §8): `../x`, empty, over-long and non-ASCII names rejected on
+      create; derived text paths cannot escape `DEFAULT_DATA_DIR`
+- [ ] Two interleaved clients on two goats stay isolated (test)
+- [ ] Suite green with `-m "not integration"`
+
+**Files affected:** `mojogoatapi.py`, `mojogoat/routes.py`, `mojogoat/operations.py`, tests
+**ADR:** ADR-016
+**Blocked by:** nothing
+
+---
+
+### ISSUE-19 · [task] mojogoat-ui: migrate off the active-goat API
+
+**Labels:** task, ui, breaking
+**Milestone:** v0.4.0
+
+**Goal:**
+`mojogoat-ui` (separate repo) calls `/api/active-goat`, `/api/active-goat/taxonomy`, `/api/graph`,
+`/api/nodes`, `/api/relationships` and `/api/operations` (`src/api/client.js`). All of these stop
+working with ISSUE-18. The UI needs a goat selector (it already lists goats via `/api/goats`) and
+must send the chosen goat name on every call. Not started; this repo does not modify the UI.
+
+**Acceptance criteria:**
+- [ ] UI picks a goat from `GET /api/goats` and scopes every request to it
+- [ ] UI checks `api_version >= 2` from `/api/status` and shows a clear message otherwise
+- [ ] ISSUE-5 and ISSUE-6 are built against the scoped routes, not the old ones
+
+**Blocked by:** ISSUE-18 route spec (not its implementation)
+
+---
+
+### ISSUE-20 · [task] Update tests, Postman, CLI scripts and docs for scoped routes
+
+**Labels:** task, documentation, tests
+**Milestone:** v0.4.0
+
+**Goal:**
+Everything that calls the old routes is updated: `tests/test_api.py`, `tests/test_api_crud.py`,
+`tests/test_api_cli.py`, `tests/run_api_tests.py`, `tests/run_api_cli_tests.sh`,
+`tests/run_all_tests.sh`, `postman/*.json`, `samples/` (if present), `API_README.md`,
+`API_TEST_README.md`, `goatctl.sh`, `goatwatch.py`, `mojogoatsync.py`.
+
+**Acceptance criteria:**
+- [ ] No remaining reference to `/api/active-goat` or an unscoped data route (`grep` clean)
+- [ ] `API_TEST_README.md` paths corrected (`/xpal-src/mojogoat/test` is stale)
+- [ ] Postman collection runs green against a v0.4.0 server
+
+**Blocked by:** ISSUE-18
+
+---
+
+### ISSUE-21 · [bug] Concurrent relationship writes to one text goat fail or hang
+
+**Labels:** bug, concurrency
+**Milestone:** future
+
+**Evidence (2026-11-01, pre-existing — identical on committed v1 `e1ed213` and on v2):**
+Raw HTTP, nodes pre-created, N concurrent `POST …/relationships` to ONE text goat:
+N=3 → `{201: 1, 400: 1, timeout: 1}`; N=12 → `{201: 1, 400: 10, timeout: 1}` (8 s client timeout,
+error bodies not captured). Only 1 relationship stored in each case. Concurrent
+`POST …/nodes` (N=12, distinct ids) all returned `201`. Two goats written concurrently also
+failed within each goat, so this is per-goat, not cross-goat interference.
+
+**Goal:**
+`TextGoat._REL_WRITE_LOCKS` are `asyncio.Lock`s keyed by `goatpath`, and Flask runs each async view
+on its own event loop, so one suspected cause is that the lock does not serialise requests across
+loops. Not verified. Not hit by one-writer-per-goat deployments that write sequentially (ADR-016
+§7; Xetrapal writes sequentially), but any multi-writer or parallel-writing client loses data or
+hangs.
+
+**Acceptance criteria:**
+- [ ] Test with N concurrent writers to one text goat; no lost or corrupted relationships
+- [ ] Fix, or document, the single-writer-per-goat constraint
+
+---
+
 ## Priority summary
 
 | Issue | Title | Priority | Milestone |
@@ -244,3 +342,7 @@ Or a dedicated `POST /api/query` with a goat list in the body.
 | ISSUE-9 | SSE for operations API | P2 | future |
 | ISSUE-10 | Multi-goat query | P3 | future |
 | ISSUE-11 | ADR index | P3 | anytime |
+| ISSUE-18 | Goat-scoped API; remove active goat (ADR-016) | P0 | v0.4.0 |
+| ISSUE-19 | mojogoat-ui: migrate off active-goat API | P1 | v0.4.0 |
+| ISSUE-20 | Update tests/Postman/scripts/docs for scoped routes | P1 | v0.4.0 |
+| ISSUE-21 | Concurrent relationship writes to one text goat fail/hang (pre-existing) | P1 | future |

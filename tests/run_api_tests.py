@@ -1,29 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Test runner for MojoGOAT API tests
+Test runner for MojoGOAT API tests (goat-scoped API v2, ADR-016)
 """
 
-import unittest
+import os
 import sys
-sys.path.append("/xpal-src/mojogoat")
 
-from test_api import MojoGoatAPITestCase
-from test_api_crud import MojoGoatAPICRUDTestCase
+import pytest
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+
 
 def run_tests():
-    """Run all API tests"""
-    # Create test suite
-    suite = unittest.TestSuite()
-    
-    # Add test cases
-    suite.addTest(unittest.makeSuite(MojoGoatAPITestCase))
-    suite.addTest(unittest.makeSuite(MojoGoatAPICRUDTestCase))
-    
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2)
-    return runner.run(suite)
+    """Run all API tests; returns the pytest exit code."""
+    return pytest.main([
+        os.path.join(HERE, "test_api.py"),
+        os.path.join(HERE, "test_api_crud.py"),
+        os.path.join(HERE, "test_api_v2.py"),
+        os.path.join(HERE, "test_operations_persistence.py"),
+        "-v", "-p", "no:cacheprovider",
+    ])
+
 
 if __name__ == '__main__':
-    result = run_tests()
-    sys.exit(not result.wasSuccessful())
+    sys.exit(int(run_tests()))

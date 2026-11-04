@@ -69,9 +69,8 @@ _status() {
             | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
-ag = d.get('active_goat') or {}
 goats = d.get('goats', [])
-print(f'  active : {ag.get(\"name\",\"—\")} / {ag.get(\"type\",\"—\")}  ({ag.get(\"goatpath\",\"\")})')
+print(f'  api    : v{d.get(\"api_version\",\"?\")}')
 print(f'  goats  : {[g[\"name\"] for g in goats]}')
 be = d.get('backends', {})
 avail = [k for k,v in be.items() if v.get('available')]

@@ -19,7 +19,7 @@ This directory contains Postman tests for the MojoGOAT API. These tests cover al
 2. Start the MojoGOAT API with the test registry:
 
 ```bash
-cd /xpal-src/mojogoat
+cd /xpal-src/arjunvenkatraman/mojogoat
 ./run_mojogoat_api.sh -r /tmp/mojogoat_test_data/registry.json -d
 ```
 
@@ -31,7 +31,7 @@ cd /xpal-src/mojogoat
 
 The tests are designed to be run in sequence, as they depend on each other. The collection is organized into the following folders:
 
-- **Goat Management**: Tests for creating, listing, and selecting goats
+- **Goat Management**: Tests for creating and listing goats
 - **Node Operations**: Tests for node CRUD operations
 - **Relationship Operations**: Tests for relationship operations
 - **Goat-Specific Operations**: Tests for goat-specific operations like getting composition and taxonomy
@@ -39,8 +39,8 @@ The tests are designed to be run in sequence, as they depend on each other. The 
 
 ## Test Data Flow
 
-1. The tests create goats of different types (text, MongoDB+PostgreSQL).
-2. They then create nodes and relationships on the active goat.
+1. The tests create goats of different types (text, memory).
+2. They then create nodes and relationships on the goat named by the `{{goat}}` variable via `/api/goats/{{goat}}/...` (API v2, ADR-016; there is no active goat).
 3. The tests verify that all CRUD operations work correctly.
 4. Finally, they clean up the test data by deleting the relationships and nodes.
 
@@ -50,8 +50,7 @@ The tests use the following environment variables:
 
 - `baseUrl`: The base URL of the API (default: http://localhost:5000)
 - `testDataPath`: The path to the test data directory (default: /tmp/mojogoat_test_data)
-- `textGoatName`: The name of the text goat (set during tests)
-- `mongopgGoatName`: The name of the MongoDB+PostgreSQL goat (set during tests)
+- `goat`: The name of the goat all data requests are scoped to (default `test_text_goat`)
 - `testNodeId1`: The ID of the first test node (set during tests)
 - `testNodeId2`: The ID of the second test node (set during tests)
 - `testRelationshipId`: The ID of the test relationship (set during tests)

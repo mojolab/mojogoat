@@ -39,7 +39,6 @@ def _render(base_url: str, prev_counts: dict, width: int = 76) -> tuple[dict, st
     if not status:
         return prev_counts, f"\n  ✗  Cannot reach {base_url}\n"
 
-    active_name = (status.get("active_goat") or {}).get("name")
     goats = status.get("goats", [])
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -49,7 +48,6 @@ def _render(base_url: str, prev_counts: dict, width: int = 76) -> tuple[dict, st
     for g in goats:
         name = g["name"]
         gtype = g["type"]
-        marker = "●" if name == active_name else " "
 
         summary = _fetch(base_url, f"/api/goats/{name}/summary")
 
@@ -75,7 +73,7 @@ def _render(base_url: str, prev_counts: dict, width: int = 76) -> tuple[dict, st
                 new_counts[name] = prev_counts[name]
 
         short = name[:26] if len(name) > 26 else name
-        rows.append((marker, short, gtype, nc, rc, delta, story_str))
+        rows.append((short, gtype, nc, rc, delta, story_str))
 
     # ── build output ──────────────────────────────────────────────
     bar = "━" * width
@@ -93,11 +91,11 @@ def _render(base_url: str, prev_counts: dict, width: int = 76) -> tuple[dict, st
         sep,
     ]
 
-    for marker, short, gtype, nc, rc, delta, story_str in rows:
+    for short, gtype, nc, rc, delta, story_str in rows:
         nc_s = str(nc) if nc != "—" else "—"
         rc_s = str(rc) if rc != "—" else "—"
         lines.append(
-            f"  {marker} {short:<27} {gtype:<10} {nc_s:>5}  {rc_s:>5}  {delta:>4}  {story_str}"
+            f"  {short:<28} {gtype:<10} {nc_s:>5}  {rc_s:>5}  {delta:>4}  {story_str}"
         )
 
     lines += [

@@ -1,8 +1,11 @@
 import copy
 import json
+import logging
 import os
 from datetime import datetime
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 _store: dict[str, dict] = {}
 
@@ -35,7 +38,11 @@ def _remove_persisted(op_id: str) -> None:
 
 def load_persisted() -> int:
     """Reload any operations persisted to disk into the in-memory store.
-    Call once at process startup. Returns the number of operations loaded."""
+    Call once at process startup. Returns the number of operations loaded.
+
+    Operations are scoped to a goat (ADR-016). Files written before that change have no
+    ``goat`` field; they are skipped with a warning and left on disk untouched.
+    """
     directory = _operations_dir()
     if not os.path.isdir(directory):
         return 0
@@ -49,17 +56,30 @@ def load_persisted() -> int:
         except (OSError, json.JSONDecodeError):
             continue
         op_id = op.get("operation_id")
-        if op_id and op_id not in _store:
+        if not op_id:
+            continue
+        if not op.get("goat"):
+            logger.warning(
+                "Skipping persisted operation %s: no 'goat' field (written before ADR-016); "
+                "left on disk", filename)
+            continue
+        if op_id not in _store:
             _store[op_id] = op
             loaded += 1
     return loaded
 
 
-def create_operation(name: str, node_ids: list[str], params: dict) -> dict:
+def _visible(op: dict | None, goat: str | None) -> bool:
+    """True if *op* exists and belongs to *goat* (``goat=None`` means unscoped, internal use)."""
+    return op is not None and (goat is None or op.get('goat') == goat)
+
+
+def create_operation(name: str, node_ids: list[str], params: dict, goat: str | None = None) -> dict:
     op_id = str(uuid4())
     now = datetime.now().isoformat()
     op: dict = {
         'operation_id': op_id,
+        'goat': goat,
         'name': name,
         'status': 'pending',
         'node_ids': node_ids,
@@ -73,14 +93,21 @@ def create_operation(name: str, node_ids: list[str], params: dict) -> dict:
     return copy.deepcopy(op)
 
 
-def get_operation(op_id: str) -> dict | None:
-    op = _store.get(op_id)
-    return copy.deepcopy(op) if op else None
+def list_operations(goat: str | None = None) -> list[dict]:
+    """Operations belonging to *goat*, oldest first."""
+    ops = [op for op in _store.values() if _visible(op, goat)]
+    ops.sort(key=lambda o: o['created'])
+    return copy.deepcopy(ops)
 
 
-def post_results(op_id: str, results: list[dict]) -> dict | None:
+def get_operation(op_id: str, goat: str | None = None) -> dict | None:
     op = _store.get(op_id)
-    if op is None:
+    return copy.deepcopy(op) if _visible(op, goat) else None
+
+
+def post_results(op_id: str, results: list[dict], goat: str | None = None) -> dict | None:
+    op = _store.get(op_id)
+    if not _visible(op, goat):
         return None
     now = datetime.now().isoformat()
     for r in results:
@@ -93,10 +120,10 @@ def post_results(op_id: str, results: list[dict]) -> dict | None:
     return copy.deepcopy(op)
 
 
-def validate_result(op_id: str, result_id: str, action: str) -> dict | None:
+def validate_result(op_id: str, result_id: str, action: str, goat: str | None = None) -> dict | None:
     """Set a result's status to 'accepted' or 'rejected'. Returns updated op, or None."""
     op = _store.get(op_id)
-    if op is None:
+    if not _visible(op, goat):
         return None
     for r in op['results']:
         if r.get('result_id') == result_id:
@@ -109,8 +136,8 @@ def validate_result(op_id: str, result_id: str, action: str) -> dict | None:
     return None
 
 
-def delete_operation(op_id: str) -> bool:
-    if op_id in _store:
+def delete_operation(op_id: str, goat: str | None = None) -> bool:
+    if _visible(_store.get(op_id), goat):
         del _store[op_id]
         _remove_persisted(op_id)
         return True

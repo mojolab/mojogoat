@@ -1,65 +1,44 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tests for the MojoGOAT API
+Tests for the MojoGOAT API (goat-scoped API v2, ADR-016).
+
+There is no "active goat": every data route is /api/goats/<goat>/... Tests that need a
+pre-populated goat create it through POST /api/goats and then use the scoped routes (or reach
+the server's instance with ApiEnv.cached_goat()).
+New v2-only behaviour lives in test_api_v2.py.
 """
 
-import unittest
 import json
 import os
-import tempfile
-import shutil
-from datetime import datetime
+import unittest
 
 import pytest
 
-import sys
-sys.path.append("/xpal-src/mojogoat")
+from api_support import ApiEnv, run
 
-from mojogoatapi import app, initialize_app, registry_path, active_goat
 
 class MojoGoatAPITestCase(unittest.TestCase):
     """Test case for the MojoGOAT API"""
 
     def setUp(self):
         """Set up test environment"""
-        app.config['TESTING'] = True
-        app.config['DEBUG'] = False
-
-        # Create a temporary directory for testing
-        self.test_dir = tempfile.mkdtemp()
-
-        # Create a temporary registry file
-        self.registry_file = os.path.join(self.test_dir, "test_registry.json")
-
-        # Keep operations.py's persistence (ADR-014) out of the real /xpal-data
-        self._prev_operations_dir = os.environ.get("MOJOGOAT_OPERATIONS_DIR")
-        os.environ["MOJOGOAT_OPERATIONS_DIR"] = os.path.join(self.test_dir, "operations")
-
-        app.config['TESTING'] = True
-
-        import mojogoatapi
-        mojogoatapi.active_goat = None
-        mojogoatapi.active_goat_name = None
-
-        from mojogoat.routes import set_active_goat_ref
-        set_active_goat_ref(None)
-
-        from mojogoat import operations
-        operations.reset_store()
-
-        initialize_app(self.registry_file)
-
-        self.client = app.test_client()
+        self.env = ApiEnv().start()
+        self.client = self.env.client
+        self.test_dir = self.env.root
+        self.registry_file = self.env.registry_file
 
     def tearDown(self):
         """Clean up test environment"""
-        shutil.rmtree(self.test_dir)
+        self.env.stop()
 
-        if self._prev_operations_dir is None:
-            os.environ.pop("MOJOGOAT_OPERATIONS_DIR", None)
-        else:
-            os.environ["MOJOGOAT_OPERATIONS_DIR"] = self._prev_operations_dir
+    def _memory_goat(self, name="test_mem", nodes=()):
+        """Create a memory goat via the API and return the server's instance of it."""
+        self.env.create_goat(name, "memory")
+        g = self.env.cached_goat(name)
+        for nodeid in nodes:
+            run(g.add_node(nodeid))
+        return g
 
     def test_list_goats_empty(self):
         """Test listing goats when the registry is empty"""
@@ -68,8 +47,8 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
         data = json.loads(response.data)
         self.assertEqual(len(data.get('goats', [])), 0)
-        self.assertIsNone(data.get('default'))
-        self.assertIsNone(data.get('active'))
+        self.assertNotIn('default', data)
+        self.assertNotIn('active', data)
 
     def test_create_text_goat(self):
         """Test creating a text goat"""
@@ -79,9 +58,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = {
             "name": "test_text_goat",
             "type": "text",
-            "goat_path": goat_dir,
-            "make_default": True,
-            "make_active": True
+            "goat_path": goat_dir
         }
 
         response = self.client.post('/api/goats', json=data)
@@ -92,8 +69,10 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
         data = json.loads(response.data)
         self.assertEqual(len(data.get('goats', [])), 1)
-        self.assertEqual(data.get('default'), "test_text_goat")
-        self.assertEqual(data.get('active'), "test_text_goat")
+        self.assertEqual(data['goats'][0]['name'], "test_text_goat")
+        self.assertEqual(data['goats'][0]['goatpath'], goat_dir)
+        self.assertNotIn('default', data)
+        self.assertNotIn('active', data)
 
     def test_create_neo4j_goat(self):
         """Test creating a Neo4j goat"""
@@ -109,9 +88,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = {
             "name": "test_neo4j_goat",
             "type": "neo4j",
-            "config_path": config_path,
-            "make_default": True,
-            "make_active": True
+            "config_path": config_path
         }
 
         response = self.client.post('/api/goats', json=data)
@@ -122,8 +99,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
         data = json.loads(response.data)
         self.assertEqual(len(data.get('goats', [])), 1)
-        self.assertEqual(data.get('default'), "test_neo4j_goat")
-        self.assertEqual(data.get('active'), "test_neo4j_goat")
+        self.assertEqual(data['goats'][0]['name'], "test_neo4j_goat")
 
     def test_set_registry_path(self):
         """Test setting the registry path"""
@@ -142,61 +118,42 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('registry_path'), new_registry_path)
 
-    def test_set_active_goat(self):
-        """Test setting the active goat"""
-        data1 = {
-            "name": "test_goat1",
-            "type": "text",
-            "goat_path": os.path.join(self.test_dir, "test_goat1"),
-            "make_default": True,
-            "make_active": True
-        }
+    def test_get_goat_entry_among_several(self):
+        """GET /api/goats/<name> addresses one goat of several (replaces 'set active goat')"""
+        for name in ("test_goat1", "test_goat2"):
+            response = self.client.post('/api/goats', json={
+                "name": name,
+                "type": "text",
+                "goat_path": os.path.join(self.test_dir, name),
+            })
+            self.assertEqual(response.status_code, 201)
 
-        data2 = {
-            "name": "test_goat2",
-            "type": "text",
-            "goat_path": os.path.join(self.test_dir, "test_goat2")
-        }
+        for name in ("test_goat1", "test_goat2"):
+            response = self.client.get(f'/api/goats/{name}')
+            self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data)
+            self.assertEqual(data['name'], name)
+            self.assertEqual(data['goatpath'], os.path.join(self.test_dir, name))
 
-        response = self.client.post('/api/goats', json=data1)
-        self.assertEqual(response.status_code, 201)
+        # Looking at goats does not select one: the list carries no active/default marker
+        data = json.loads(self.client.get('/api/goats').data)
+        self.assertEqual(len(data['goats']), 2)
+        self.assertNotIn('default', data)
+        self.assertNotIn('active', data)
 
-        response = self.client.post('/api/goats', json=data2)
-        self.assertEqual(response.status_code, 201)
-
-        data = {
-            "name": "test_goat2",
-            "make_default": True
-        }
-
-        response = self.client.post('/api/active-goat', json=data)
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.get('/api/active-goat')
-        self.assertEqual(response.status_code, 200)
-
-        data = json.loads(response.data)
-        self.assertEqual(data.get('active_goat'), "test_goat2")
-
-        response = self.client.get('/api/goats')
-        self.assertEqual(response.status_code, 200)
-
-        data = json.loads(response.data)
-        self.assertEqual(data.get('default'), "test_goat2")
-
-    def test_error_no_active_goat(self):
-        """Test error when no active goat is selected"""
-        response = self.client.get('/api/nodes')
+    def test_error_unknown_goat(self):
+        """Scoped routes return 404 for a goat that is not in the registry (was: no active goat)"""
+        response = self.client.get('/api/goats/nope/nodes')
         self.assertEqual(response.status_code, 404)
 
         data = json.loads(response.data)
-        self.assertEqual(data.get('error'), "No active goat selected")
+        self.assertEqual(data.get('error'), "Goat 'nope' not found")
 
-        response = self.client.post('/api/nodes', json={"nodeid": "test_node"})
+        response = self.client.post('/api/goats/nope/nodes', json={"nodeid": "test_node"})
         self.assertEqual(response.status_code, 404)
 
         data = json.loads(response.data)
-        self.assertEqual(data.get('error'), "No active goat selected")
+        self.assertEqual(data.get('error'), "Goat 'nope' not found")
 
     def test_error_missing_fields(self):
         """Test error when required fields are missing"""
@@ -223,7 +180,7 @@ class MojoGoatAPITestCase(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data.get('status'), 'ok')
         self.assertIn('goat_count', data)
-        self.assertIn('active_goat', data)
+        self.assertNotIn('active_goat', data)
 
     def test_health_reflects_goat_count(self):
         """Test that /health goat_count updates when goats are added"""
@@ -237,83 +194,62 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_post_node_with_slash_returns_400(self):
         """Test that nodeids containing '/' return 400 with a useful message"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        self._memory_goat()
 
-        mojogoatapi.active_goat = MemoryGoat()
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.post('/api/nodes', json={"nodeid": "val:/some/path"})
+        r = self.client.post('/api/goats/test_mem/nodes', json={"nodeid": "val:/some/path"})
         self.assertEqual(r.status_code, 400)
         data = json.loads(r.data)
         self.assertIn("nodeid", data["error"])
         self.assertIn("/", data["error"])
 
     def test_get_relationships_props_filter(self):
-        """Test GET /api/relationships filters by arbitrary props and limit"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """Test GET /api/goats/<goat>/relationships filters by arbitrary props and limit"""
+        g = self._memory_goat(nodes=("a", "b", "c"))
+        run(g.create_relationship("a", "b", "KNOWS", state="pending"))
+        run(g.create_relationship("a", "c", "KNOWS", state="confirmed"))
 
-        g = MemoryGoat()
-        asyncio.run(g.add_node("a"))
-        asyncio.run(g.add_node("b"))
-        asyncio.run(g.add_node("c"))
-        asyncio.run(g.create_relationship("a", "b", "KNOWS", state="pending"))
-        asyncio.run(g.create_relationship("a", "c", "KNOWS", state="confirmed"))
-
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.get('/api/relationships?state=pending')
+        base = '/api/goats/test_mem/relationships'
+        r = self.client.get(f'{base}?state=pending')
         self.assertEqual(r.status_code, 200)
         rels = json.loads(r.data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['target_id'], 'b')
 
-        r = self.client.get('/api/relationships?target=c')
+        r = self.client.get(f'{base}?target=c')
         self.assertEqual(r.status_code, 200)
         rels = json.loads(r.data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['state'], 'confirmed')
 
-        r = self.client.get('/api/relationships?limit=1')
+        r = self.client.get(f'{base}?limit=1')
         self.assertEqual(r.status_code, 200)
         rels = json.loads(r.data)
         self.assertEqual(len(rels), 1)
 
-        r = self.client.get('/api/relationships?story=KNOWS&state=confirmed&target=c')
+        r = self.client.get(f'{base}?story=KNOWS&state=confirmed&target=c')
         self.assertEqual(r.status_code, 200)
         rels = json.loads(r.data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['source_id'], 'a')
 
     def test_get_relationships_offset(self):
-        """Test GET /api/relationships?offset=N paginates correctly"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
-
-        g = MemoryGoat()
-        asyncio.run(g.add_node("src"))
+        """Test GET /api/goats/<goat>/relationships?offset=N paginates correctly"""
+        g = self._memory_goat(nodes=("src",))
         for i in range(5):
-            asyncio.run(g.add_node(f"tgt{i}"))
-            asyncio.run(g.create_relationship("src", f"tgt{i}", "LINKED"))
+            run(g.add_node(f"tgt{i}"))
+            run(g.create_relationship("src", f"tgt{i}", "LINKED"))
 
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        all_r = self.client.get('/api/relationships')
+        base = '/api/goats/test_mem/relationships'
+        all_r = self.client.get(base)
         all_rels = json.loads(all_r.data)
         self.assertEqual(len(all_rels), 5)
 
-        r = self.client.get('/api/relationships?offset=2')
+        r = self.client.get(f'{base}?offset=2')
         paged = json.loads(r.data)
         self.assertEqual(len(paged), 3)
         self.assertEqual(paged[0]['relationship_id'], all_rels[2]['relationship_id'])
 
-        r2 = self.client.get('/api/relationships?offset=2&limit=2')
+        r2 = self.client.get(f'{base}?offset=2&limit=2')
         paged2 = json.loads(r2.data)
         self.assertEqual(len(paged2), 2)
 
@@ -322,25 +258,17 @@ class MojoGoatAPITestCase(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_patch_relationship_updates_props(self):
-        """PATCH /api/relationships/<id> merges props and returns 200"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
-
-        g = MemoryGoat()
-        asyncio.run(g.add_node("a"))
-        asyncio.run(g.add_node("b"))
-        rel = asyncio.run(g.create_relationship("a", "b", "KNOWS", state="pending"))
+        """PATCH /api/goats/<goat>/relationships/<id> merges props and returns 200"""
+        g = self._memory_goat(nodes=("a", "b"))
+        rel = run(g.create_relationship("a", "b", "KNOWS", state="pending"))
         rel_id = rel['relationship_id']
 
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.patch(f'/api/relationships/{rel_id}', json={"state": "confirmed", "note": "verified"})
+        base = '/api/goats/test_mem/relationships'
+        r = self.client.patch(f'{base}/{rel_id}', json={"state": "confirmed", "note": "verified"})
         self.assertEqual(r.status_code, 200)
         self.assertEqual(json.loads(r.data)['relationship_id'], rel_id)
 
-        r2 = self.client.get(f'/api/relationships/{rel_id}')
+        r2 = self.client.get(f'{base}/{rel_id}')
         self.assertEqual(r2.status_code, 200)
         data = json.loads(r2.data)
         self.assertEqual(data['state'], 'confirmed')
@@ -364,7 +292,6 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_goat_summary_returns_counts(self):
         """GET /api/goats/<name>/summary returns node_count, rel_count, taxonomy"""
-        import asyncio
         from mojogoat.goatbases.textgoat import TextGoat
 
         goat_dir = os.path.join(self.test_dir, "summary_goat")
@@ -372,9 +299,9 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(r.status_code, 201)
 
         g = TextGoat({"goatpath": goat_dir, "goatname": "summary_test"})
-        asyncio.run(g.add_node("a"))
-        asyncio.run(g.add_node("b"))
-        asyncio.run(g.create_relationship("a", "b", "KNOWS"))
+        run(g.add_node("a"))
+        run(g.add_node("b"))
+        run(g.create_relationship("a", "b", "KNOWS"))
 
         r = self.client.get('/api/goats/summary_test/summary')
         self.assertEqual(r.status_code, 200)
@@ -383,38 +310,19 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertEqual(data['rel_count'], 1)
         self.assertIn('KNOWS', data['taxonomy'])
 
-    def test_post_backend_auto_excludes_falkordb_neo4j(self):
-        """POST /api/backend with type=auto never probes FalkorDB or Neo4j (ADR-010)"""
-        r = self.client.post('/api/backend', json={
-            "type": "auto",
-            "goat_path": os.path.join(self.test_dir, "auto_goat"),
-            "goat_name": "auto",
-        })
-        self.assertEqual(r.status_code, 200)
-        data = json.loads(r.data)
-        self.assertIn(data['type'], ('text', 'memory'))
-        self.assertNotIn(data['type'], ('falkordb', 'neo4j'))
-
     # ------------------------------------------------------------------
-    # Item 12 — GET /api/graph (ADR-011)
+    # Item 12 — GET /api/goats/<goat>/graph (ADR-011)
     # ------------------------------------------------------------------
 
     def test_get_graph_basic(self):
-        """GET /api/graph returns nodes referenced by edges; orphan nodes excluded"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """GET graph returns nodes referenced by edges; orphan nodes excluded"""
+        g = self._memory_goat()
+        run(g.add_node("a", labels=["Person"]))
+        run(g.add_node("b", labels=["Person"]))
+        run(g.add_node("c", labels=["Thing"]))  # orphan — no edges
+        run(g.create_relationship("a", "b", "KNOWS"))
 
-        g = MemoryGoat()
-        asyncio.run(g.add_node("a", labels=["Person"]))
-        asyncio.run(g.add_node("b", labels=["Person"]))
-        asyncio.run(g.add_node("c", labels=["Thing"]))  # orphan — no edges
-        asyncio.run(g.create_relationship("a", "b", "KNOWS"))
-
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.get('/api/graph')
+        r = self.client.get('/api/goats/test_mem/graph')
         self.assertEqual(r.status_code, 200)
         data = json.loads(r.data)
 
@@ -426,43 +334,23 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertNotIn('c', node_ids)
 
     def test_get_graph_story_filter(self):
-        """GET /api/graph?story= filters edges by story"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """GET graph?story= filters edges by story"""
+        g = self._memory_goat(nodes=("a", "b", "c"))
+        run(g.create_relationship("a", "b", "KNOWS"))
+        run(g.create_relationship("a", "c", "HATES"))
 
-        g = MemoryGoat()
-        asyncio.run(g.add_node("a"))
-        asyncio.run(g.add_node("b"))
-        asyncio.run(g.add_node("c"))
-        asyncio.run(g.create_relationship("a", "b", "KNOWS"))
-        asyncio.run(g.create_relationship("a", "c", "HATES"))
-
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.get('/api/graph?story=KNOWS')
+        r = self.client.get('/api/goats/test_mem/graph?story=KNOWS')
         data = json.loads(r.data)
         self.assertEqual(data['edge_count'], 1)
         self.assertEqual(data['edges'][0]['story'], 'KNOWS')
 
     def test_get_graph_node_ids_subgraph(self):
-        """GET /api/graph?node_ids= restricts to the specified subgraph"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """GET graph?node_ids= restricts to the specified subgraph"""
+        g = self._memory_goat(nodes=("a", "b", "c"))
+        run(g.create_relationship("a", "b", "KNOWS"))
+        run(g.create_relationship("b", "c", "KNOWS"))
 
-        g = MemoryGoat()
-        asyncio.run(g.add_node("a"))
-        asyncio.run(g.add_node("b"))
-        asyncio.run(g.add_node("c"))
-        asyncio.run(g.create_relationship("a", "b", "KNOWS"))
-        asyncio.run(g.create_relationship("b", "c", "KNOWS"))
-
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-
-        r = self.client.get('/api/graph?node_ids=a,b')
+        r = self.client.get('/api/goats/test_mem/graph?node_ids=a,b')
         self.assertEqual(r.status_code, 200)
         data = json.loads(r.data)
         self.assertEqual(data['edge_count'], 1)  # only a→b; b→c excluded
@@ -471,46 +359,43 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertIn('b', node_ids)
         self.assertNotIn('c', node_ids)
 
-    def test_get_graph_no_active_goat(self):
-        """GET /api/graph returns 404 when no active goat"""
-        r = self.client.get('/api/graph')
+    def test_get_graph_unknown_goat(self):
+        """GET graph returns 404 for an unknown goat (was: no active goat)"""
+        r = self.client.get('/api/goats/nope/graph')
         self.assertEqual(r.status_code, 404)
 
     # ------------------------------------------------------------------
-    # Item 13 — Operations API (ADR-012)
+    # Item 13 — Operations API (ADR-012), scoped per goat (ADR-016)
     # ------------------------------------------------------------------
 
+    OPS = '/api/goats/test_mem/operations'
+
     def _setup_memory_goat(self):
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
-        g = MemoryGoat()
-        asyncio.run(g.add_node("x"))
-        asyncio.run(g.add_node("y"))
-        mojogoatapi.active_goat = g
-        mojogoatapi.active_goat_name = "test_mem"
-        return g
+        return self._memory_goat(nodes=("x", "y"))
 
     def test_operations_create_and_get(self):
-        """POST /api/operations creates with pending status; GET returns it"""
-        r = self.client.post('/api/operations', json={"name": "label_prop", "node_ids": ["x"], "params": {}})
+        """POST operations creates with pending status; GET returns it"""
+        self._setup_memory_goat()
+        r = self.client.post(self.OPS, json={"name": "label_prop", "node_ids": ["x"], "params": {}})
         self.assertEqual(r.status_code, 201)
         op = json.loads(r.data)
         self.assertEqual(op['status'], 'pending')
         self.assertEqual(op['name'], 'label_prop')
+        self.assertEqual(op['goat'], 'test_mem')
         op_id = op['operation_id']
 
-        r2 = self.client.get(f'/api/operations/{op_id}')
+        r2 = self.client.get(f'{self.OPS}/{op_id}')
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(json.loads(r2.data)['operation_id'], op_id)
 
     def test_operations_post_results_transitions_to_awaiting_validation(self):
-        """POST /api/operations/<id>/results transitions status to awaiting_validation"""
+        """POST operations/<id>/results transitions status to awaiting_validation"""
+        self._setup_memory_goat()
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "op1", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "op1", "node_ids": [], "params": {}}).data
         )['operation_id']
 
-        r = self.client.post(f'/api/operations/{op_id}/results', json={
+        r = self.client.post(f'{self.OPS}/{op_id}/results', json={
             "results": [{"type": "add_node", "payload": {"nodeid": "z", "labels": ["New"]}}]
         })
         self.assertEqual(r.status_code, 200)
@@ -521,99 +406,98 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_operations_accept_result_writes_to_goat(self):
         """Accepting a result executes the write and transitions op to completed"""
-        import asyncio
         g = self._setup_memory_goat()
 
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "add_z", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "add_z", "node_ids": [], "params": {}}).data
         )['operation_id']
         result_id = json.loads(
-            self.client.post(f'/api/operations/{op_id}/results', json={
+            self.client.post(f'{self.OPS}/{op_id}/results', json={
                 "results": [{"type": "add_node", "payload": {"nodeid": "z", "labels": ["New"]}}]
             }).data
         )['results'][0]['result_id']
 
-        r = self.client.post(f'/api/operations/{op_id}/validate', json={"result_id": result_id, "action": "accept"})
+        r = self.client.post(f'{self.OPS}/{op_id}/validate', json={"result_id": result_id, "action": "accept"})
         self.assertEqual(r.status_code, 200)
         op = json.loads(r.data)
         self.assertEqual(op['status'], 'completed')
         self.assertEqual(op['results'][0]['status'], 'accepted')
 
-        node = asyncio.run(g.get_node("z"))
+        node = run(g.get_node("z"))
         self.assertIsNotNone(node)
         self.assertEqual(node.get('labels'), ['New'])
 
     def test_operations_reject_result_does_not_write(self):
         """Rejecting a result does not write to the goat"""
-        import asyncio
         g = self._setup_memory_goat()
 
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "reject_op", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "reject_op", "node_ids": [], "params": {}}).data
         )['operation_id']
         result_id = json.loads(
-            self.client.post(f'/api/operations/{op_id}/results', json={
+            self.client.post(f'{self.OPS}/{op_id}/results', json={
                 "results": [{"type": "add_node", "payload": {"nodeid": "should_not_exist"}}]
             }).data
         )['results'][0]['result_id']
 
-        r = self.client.post(f'/api/operations/{op_id}/validate', json={"result_id": result_id, "action": "reject"})
+        r = self.client.post(f'{self.OPS}/{op_id}/validate', json={"result_id": result_id, "action": "reject"})
         self.assertEqual(r.status_code, 200)
         op = json.loads(r.data)
         self.assertEqual(op['results'][0]['status'], 'rejected')
         self.assertEqual(op['status'], 'completed')
 
-        self.assertIsNone(asyncio.run(g.get_node("should_not_exist")))
+        self.assertIsNone(run(g.get_node("should_not_exist")))
 
     def test_operations_accept_add_relationship(self):
         """Accepting add_relationship result creates the relationship in the goat"""
-        import asyncio
         g = self._setup_memory_goat()
 
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "link_op", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "link_op", "node_ids": [], "params": {}}).data
         )['operation_id']
         result_id = json.loads(
-            self.client.post(f'/api/operations/{op_id}/results', json={
+            self.client.post(f'{self.OPS}/{op_id}/results', json={
                 "results": [{"type": "add_relationship", "payload": {"source": "x", "target": "y", "story": "CONNECTED"}}]
             }).data
         )['results'][0]['result_id']
 
-        r = self.client.post(f'/api/operations/{op_id}/validate', json={"result_id": result_id, "action": "accept"})
+        r = self.client.post(f'{self.OPS}/{op_id}/validate', json={"result_id": result_id, "action": "accept"})
         self.assertEqual(r.status_code, 200)
 
-        rels = asyncio.run(g.get_relationships("x", "y", "CONNECTED"))
+        rels = run(g.get_relationships("x", "y", "CONNECTED"))
         self.assertEqual(len(rels), 1)
 
     def test_operations_delete(self):
-        """DELETE /api/operations/<id> removes the operation"""
+        """DELETE operations/<id> removes the operation"""
+        self._setup_memory_goat()
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "del_op", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "del_op", "node_ids": [], "params": {}}).data
         )['operation_id']
 
-        r = self.client.delete(f'/api/operations/{op_id}')
+        r = self.client.delete(f'{self.OPS}/{op_id}')
         self.assertEqual(r.status_code, 200)
 
-        r2 = self.client.get(f'/api/operations/{op_id}')
+        r2 = self.client.get(f'{self.OPS}/{op_id}')
         self.assertEqual(r2.status_code, 404)
 
     def test_operations_missing_name_returns_400(self):
-        """POST /api/operations without name returns 400"""
-        r = self.client.post('/api/operations', json={"node_ids": []})
+        """POST operations without name returns 400"""
+        self._setup_memory_goat()
+        r = self.client.post(self.OPS, json={"node_ids": []})
         self.assertEqual(r.status_code, 400)
 
     def test_operations_validate_bad_action_returns_400(self):
-        """POST /api/operations/<id>/validate with unknown action returns 400"""
+        """POST operations/<id>/validate with unknown action returns 400"""
         self._setup_memory_goat()
         op_id = json.loads(
-            self.client.post('/api/operations', json={"name": "x", "node_ids": [], "params": {}}).data
+            self.client.post(self.OPS, json={"name": "x", "node_ids": [], "params": {}}).data
         )['operation_id']
-        self.client.post(f'/api/operations/{op_id}/results', json={
+        self.client.post(f'{self.OPS}/{op_id}/results', json={
             "results": [{"type": "add_node", "payload": {"nodeid": "q"}}]
         })
-        result_id = json.loads(self.client.get(f'/api/operations/{op_id}').data)['results'][0]['result_id']
+        result_id = json.loads(self.client.get(f'{self.OPS}/{op_id}').data)['results'][0]['result_id']
 
-        r = self.client.post(f'/api/operations/{op_id}/validate', json={"result_id": result_id, "action": "maybe"})
+        r = self.client.post(f'{self.OPS}/{op_id}/validate', json={"result_id": result_id, "action": "maybe"})
         self.assertEqual(r.status_code, 400)
 
     # ------------------------------------------------------------------
@@ -621,42 +505,33 @@ class MojoGoatAPITestCase(unittest.TestCase):
     # ------------------------------------------------------------------
 
     def test_compact_textgoat_preserves_rels_and_removes_old_snapshots(self):
-        """POST /api/active-goat/compact preserves relationships and deletes orphaned snapshots"""
-        import asyncio
-        import mojogoatapi
-        from mojogoat.goatbases.textgoat import TextGoat
-
-        goat_dir = os.path.join(self.test_dir, "compact_goat")
-        goat = TextGoat({"goatpath": goat_dir, "goatname": "compact"})
-        asyncio.run(goat.add_node("a"))
-        asyncio.run(goat.add_node("b"))
-        asyncio.run(goat.create_relationship("a", "b", "KNOWS"))
-        asyncio.run(goat.create_relationship("a", "b", "LIKES"))
+        """POST /api/goats/<goat>/compact preserves relationships and deletes orphaned snapshots"""
+        goat_dir = self.env.create_text_goat("compact")
+        base = '/api/goats/compact'
+        self.assertEqual(self.client.post(f'{base}/nodes', json={"nodeid": "a"}).status_code, 201)
+        self.assertEqual(self.client.post(f'{base}/nodes', json={"nodeid": "b"}).status_code, 201)
+        for story in ("KNOWS", "LIKES"):
+            r = self.client.post(f'{base}/relationships',
+                                 json={"source": "a", "target": "b", "story": story})
+            self.assertEqual(r.status_code, 201)
 
         snapshots_dir = os.path.join(goat_dir, "snapshots")
         self.assertGreater(len(os.listdir(snapshots_dir)), 1)
 
-        mojogoatapi.active_goat = goat
-        mojogoatapi.active_goat_name = "compact"
-
-        r = self.client.post('/api/active-goat/compact')
+        r = self.client.post(f'{base}/compact')
         self.assertEqual(r.status_code, 200)
         data = json.loads(r.data)
         self.assertEqual(data['relationship_count'], 2)
 
         self.assertEqual(len(os.listdir(snapshots_dir)), 1)
-        rels = asyncio.run(goat.get_relationships())
+        rels = json.loads(self.client.get(f'{base}/relationships').data)
         self.assertEqual(len(rels), 2)
 
     def test_compact_non_textgoat_returns_400(self):
-        """POST /api/active-goat/compact returns 400 for non-text backends"""
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """POST /api/goats/<goat>/compact returns 400 for non-text backends"""
+        self._memory_goat("mem")
 
-        mojogoatapi.active_goat = MemoryGoat()
-        mojogoatapi.active_goat_name = "mem"
-
-        r = self.client.post('/api/active-goat/compact')
+        r = self.client.post('/api/goats/mem/compact')
         self.assertEqual(r.status_code, 400)
         self.assertIn('text', json.loads(r.data)['error'])
 
@@ -666,32 +541,27 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_import_relationships_round_trip(self):
         """dump → import into empty goat → verify count and content match"""
-        import asyncio
-        import mojogoatapi
         from mojogoat.goatbases.textgoat import TextGoat
 
         src_dir = os.path.join(self.test_dir, "src_goat")
         src = TextGoat({"goatpath": src_dir, "goatname": "src"})
-        asyncio.run(src.add_node("a"))
-        asyncio.run(src.add_node("b"))
-        asyncio.run(src.create_relationship("a", "b", "KNOWS"))
+        run(src.add_node("a"))
+        run(src.add_node("b"))
+        run(src.create_relationship("a", "b", "KNOWS"))
 
         dump_file = os.path.join(self.test_dir, "dump.gq")
-        asyncio.run(src.dump_all_rels(dump_file))
+        run(src.dump_all_rels(dump_file))
 
-        dst_dir = os.path.join(self.test_dir, "dst_goat")
-        dst = TextGoat({"goatpath": dst_dir, "goatname": "dst"})
-        mojogoatapi.active_goat = dst
-        mojogoatapi.active_goat_name = "dst"
+        self.env.create_text_goat("dst")
 
-        r = self.client.post('/api/active-goat/import-relationships', json={"filename": dump_file})
+        r = self.client.post('/api/goats/dst/import-relationships', json={"filename": dump_file})
         self.assertEqual(r.status_code, 200)
         data = json.loads(r.data)
         self.assertEqual(data['imported'], 1)
         self.assertEqual(data['skipped'], 0)
         self.assertEqual(data['errors'], [])
 
-        rels = asyncio.run(dst.get_relationships())
+        rels = json.loads(self.client.get('/api/goats/dst/relationships').data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['source_id'], 'a')
         self.assertEqual(rels[0]['target_id'], 'b')
@@ -699,33 +569,28 @@ class MojoGoatAPITestCase(unittest.TestCase):
 
     def test_import_relationships_round_trip_preserves_props(self):
         """dump → import must not drop relationship_id or **props (regression for #16)"""
-        import asyncio
-        import mojogoatapi
         from mojogoat.goatbases.textgoat import TextGoat
 
         src_dir = os.path.join(self.test_dir, "src_props_goat")
         src = TextGoat({"goatpath": src_dir, "goatname": "src"})
-        asyncio.run(src.add_node("a"))
-        asyncio.run(src.add_node("b"))
-        created = asyncio.run(
+        run(src.add_node("a"))
+        run(src.add_node("b"))
+        created = run(
             src.create_relationship("a", "b", "KNOWS", smriti_state="confirmed", weight=3)
         )
 
         dump_file = os.path.join(self.test_dir, "dump_props.gq")
-        asyncio.run(src.dump_all_rels(dump_file))
+        run(src.dump_all_rels(dump_file))
 
-        dst_dir = os.path.join(self.test_dir, "dst_props_goat")
-        dst = TextGoat({"goatpath": dst_dir, "goatname": "dst"})
-        mojogoatapi.active_goat = dst
-        mojogoatapi.active_goat_name = "dst"
+        self.env.create_text_goat("dst")
 
-        r = self.client.post('/api/active-goat/import-relationships', json={"filename": dump_file})
+        r = self.client.post('/api/goats/dst/import-relationships', json={"filename": dump_file})
         self.assertEqual(r.status_code, 200)
         data = json.loads(r.data)
         self.assertEqual(data['imported'], 1)
         self.assertEqual(data['errors'], [])
 
-        rels = asyncio.run(dst.get_relationships())
+        rels = json.loads(self.client.get('/api/goats/dst/relationships').data)
         self.assertEqual(len(rels), 1)
         self.assertEqual(rels[0]['smriti_state'], 'confirmed')
         self.assertEqual(rels[0]['weight'], 3)
@@ -734,99 +599,80 @@ class MojoGoatAPITestCase(unittest.TestCase):
         self.assertNotEqual(rels[0]['relationship_id'], created['relationship_id'])
 
     def test_import_missing_filename_returns_400(self):
-        """POST /api/active-goat/import-relationships without filename returns 400"""
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """POST /api/goats/<goat>/import-relationships without filename returns 400"""
+        self._memory_goat("mem")
 
-        mojogoatapi.active_goat = MemoryGoat()
-        mojogoatapi.active_goat_name = "mem"
-
-        r = self.client.post('/api/active-goat/import-relationships', json={})
+        r = self.client.post('/api/goats/mem/import-relationships', json={})
         self.assertEqual(r.status_code, 400)
 
     def test_import_nonexistent_file_returns_400(self):
-        """POST /api/active-goat/import-relationships with missing file returns 400"""
-        import mojogoatapi
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        """POST /api/goats/<goat>/import-relationships with missing file returns 400"""
+        self._memory_goat("mem")
 
-        mojogoatapi.active_goat = MemoryGoat()
-        mojogoatapi.active_goat_name = "mem"
-
-        r = self.client.post('/api/active-goat/import-relationships', json={"filename": "/nonexistent/path.gq"})
+        r = self.client.post('/api/goats/mem/import-relationships', json={"filename": "/nonexistent/path.gq"})
         self.assertEqual(r.status_code, 400)
         self.assertIn('not found', json.loads(r.data)['error'])
 
-    def test_switching_active_goat_updates_routes_endpoints(self):
-        """POST /api/active-goat must be reflected by routes.py endpoints (regression for #20).
+    def test_scoped_writes_follow_the_url_not_the_previous_request(self):
+        """Writes land in the goat named in the URL (regression for #20, now structural).
 
-        Goes through the real set_active_goat() path (not a direct `mojogoatapi.active_goat =`
-        assignment, which other tests use as a shortcut) so it actually exercises the
-        routes.set_active_goat_ref() sync that #20's fix added.
+        Replaces test_switching_active_goat_updates_routes_endpoints: there is nothing to
+        switch any more, so alternate between two text goats and check each write's destination.
         """
-        goat1 = {
-            "name": "goat_one",
-            "type": "text",
-            "goat_path": os.path.join(self.test_dir, "goat_one"),
-            "make_active": True,
-        }
-        goat2 = {
-            "name": "goat_two",
-            "type": "text",
-            "goat_path": os.path.join(self.test_dir, "goat_two"),
-        }
-        self.assertEqual(self.client.post('/api/goats', json=goat1).status_code, 201)
-        self.assertEqual(self.client.post('/api/goats', json=goat2).status_code, 201)
+        self.env.create_text_goat("goat_one")
+        self.env.create_text_goat("goat_two")
 
         self.assertEqual(
-            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_one"}).status_code, 201
+            self.client.post('/api/goats/goat_one/nodes', json={"nodeid": "only_in_goat_one"}).status_code, 201
         )
-
-        r = self.client.post('/api/active-goat', json={"name": "goat_two"})
-        self.assertEqual(r.status_code, 200)
         self.assertEqual(
-            self.client.post('/api/nodes', json={"nodeid": "only_in_goat_two"}).status_code, 201
+            self.client.post('/api/goats/goat_two/nodes', json={"nodeid": "only_in_goat_two"}).status_code, 201
         )
 
-        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/goats/goat_two/nodes').data)}
         self.assertEqual(nodeids, {"only_in_goat_two"})
 
-        self.client.post('/api/active-goat', json={"name": "goat_one"})
-        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/nodes').data)}
+        nodeids = {n['nodeid'] for n in json.loads(self.client.get('/api/goats/goat_one/nodes').data)}
         self.assertEqual(nodeids, {"only_in_goat_one"})
 
 
-class RoutesActiveGoatIsolationTestCase(unittest.TestCase):
-    """Unit tests for mojogoat.routes.get_active_goat()/check_active_goat() (regression for #20)."""
+class RoutesInjectedResolverTestCase(unittest.TestCase):
+    """mojogoat.routes gets its goat resolver injected (ADR-016): no mojogoatapi import, no
+    module-global goat. Replaces the old get_active_goat()/check_active_goat() unit tests
+    (regression for #20, whose module-identity split can no longer occur)."""
 
-    def test_get_active_goat_reflects_set_active_goat_ref(self):
-        from mojogoat.routes import get_active_goat, set_active_goat_ref
+    def test_init_routes_uses_the_injected_resolver(self):
+        from flask import Flask
+        from mojogoat import routes
+        from mojogoat.errors import GoatNotFound
         from mojogoat.goatbases.memorygoat import MemoryGoat
 
-        set_active_goat_ref(None)
-        self.assertIsNone(get_active_goat())
+        goats = {"g1": MemoryGoat()}
+        run(goats["g1"].add_node("only_in_g1"))
 
-        goat = MemoryGoat()
-        set_active_goat_ref(goat)
-        self.assertIs(get_active_goat(), goat)
+        def resolver(name):
+            if name not in goats:
+                raise GoatNotFound(name)
+            return goats[name]
 
-        set_active_goat_ref(None)
-        self.assertIsNone(get_active_goat())
+        fresh = Flask(__name__)
+        routes.init_routes(fresh, resolver)
+        client = fresh.test_client()
 
-    def test_check_active_goat_errors_only_when_none(self):
-        from mojogoatapi import app
-        from mojogoat.routes import check_active_goat, set_active_goat_ref
-        from mojogoat.goatbases.memorygoat import MemoryGoat
+        r = client.get('/api/goats/g1/nodes')
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual([n['nodeid'] for n in r.get_json()], ["only_in_g1"])
+        self.assertEqual(client.get('/api/goats/g2/nodes').status_code, 404)
 
-        with app.app_context():
-            set_active_goat_ref(None)
-            error_response = check_active_goat()
-            self.assertIsNotNone(error_response)
-            self.assertEqual(error_response[1], 404)
+    def test_active_goat_machinery_is_gone(self):
+        import mojogoatapi
+        from mojogoat import routes
 
-            set_active_goat_ref(MemoryGoat())
-            self.assertIsNone(check_active_goat())
-
-            set_active_goat_ref(None)
+        for attr in ("get_active_goat", "set_active_goat_ref", "check_active_goat",
+                     "requires_active_goat"):
+            self.assertFalse(hasattr(routes, attr), attr)
+        for attr in ("active_goat", "active_goat_name", "set_active_goat"):
+            self.assertFalse(hasattr(mojogoatapi, attr), attr)
 
 
 if __name__ == '__main__':

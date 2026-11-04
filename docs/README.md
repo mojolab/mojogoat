@@ -5,7 +5,8 @@
 | Doc | What it covers |
 |---|---|
 | [filing-issues.md](filing-issues.md) | How to report issues and the contributor workflow (ADR → Issue → Todo → branch → MR) |
-| [decisions/](decisions/) | Architecture Decision Records — this repo's ADR home (`ADR-NNN-*.md`, currently 0001-0014) |
+| [decisions/](decisions/) | Architecture Decision Records — this repo's ADR home (`ADR-NNN-*.md`, currently 0001-0014 and 0016; 0015 is on the unmerged branch `docs/adr-0015-and-samples`) |
+| [api-v2-goat-scoped.md](api-v2-goat-scoped.md) | Normative spec for the v0.4.0 goat-scoped API (ADR-016), with every status code; `API_README.md` is the shorter reference |
 | `tasks/todo.md` | The local work log (Shipped / Upcoming / Known issues) |
 | `tasks/lessons.md` | Dated discoveries and gotchas |
 

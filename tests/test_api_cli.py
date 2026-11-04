@@ -36,10 +36,13 @@ class MojoGOATAPITester:
             test_data_path: Path to store test data
         """
         self.base_url = base_url.rstrip("/")
-        self.test_data_path = test_data_path or tempfile.mkdtemp(prefix="mojogoat_cli_test_")
+        self.test_data_path = os.path.abspath(
+            test_data_path or tempfile.mkdtemp(prefix="mojogoat_cli_test_"))
         self.session = requests.Session()
         self.text_goat_name = f"test_text_goat_{int(time.time())}"
-        self.mongopg_goat_name = f"test_mongopg_goat_{int(time.time())}"
+        self.memory_goat_name = f"test_memory_goat_{int(time.time())}"
+        # API v2 (ADR-016): every data route is scoped to a goat named in the URL
+        self.scoped = f"/api/goats/{self.text_goat_name}"
         self.test_node_id1 = f"test_node1_{int(time.time())}"
         self.test_node_id2 = f"test_node2_{int(time.time())}"
         self.test_relationship_id = None
@@ -73,15 +76,19 @@ class MojoGOATAPITester:
 
     def run_tests(self):
         """Run all tests."""
+        # API v2 contract
+        self.test_status_api_version()
+        self.test_removed_routes_return_410()
+
         # Test goat management
         self.test_get_registry()
         self.test_set_registry()
         self.test_list_goats_empty()
         self.test_create_text_goat()
-        self.test_create_mongopg_goat()
+        self.test_create_memory_goat()
+        self.test_make_active_rejected()
         self.test_list_goats()
-        self.test_get_active_goat()
-        self.test_set_active_goat()
+        self.test_get_goat()
         
         # Test node operations
         self.test_create_node()
@@ -107,6 +114,7 @@ class MojoGOATAPITester:
         # Clean up
         self.test_delete_relationship()
         self.test_delete_nodes()
+        self.test_delete_memory_goat()
         
         print("\nAll tests completed successfully!")
         
@@ -201,9 +209,7 @@ class MojoGOATAPITester:
                 "name": self.text_goat_name,
                 "type": "text",
                 "description": "A test text goat",
-                "goat_path": goat_path,
-                "make_default": True,
-                "make_active": True
+                "goat_path": goat_path
             }, 
             expected_status=201
         )
@@ -212,27 +218,65 @@ class MojoGOATAPITester:
         assert "goat" in response, "Response should contain goat"
         assert response["goat"]["name"] == self.text_goat_name, "Goat name should match"
 
-    def test_create_mongopg_goat(self):
-        """Test creating a MongoDB+PostgreSQL goat."""
-        print("\n--- Test: Create MongoDB+PostgreSQL Goat ---")
+    def test_create_memory_goat(self):
+        """Test creating a second (memory) goat."""
+        print("\n--- Test: Create Memory Goat ---")
         response = self._request(
             "POST", 
             "/api/goats", 
             json_data={
-                "name": self.mongopg_goat_name,
-                "type": "mongopg",
-                "description": "A test MongoDB+PostgreSQL goat",
-                "mongodb_uri": f"mongodb://localhost/{self.mongopg_goat_name}",
-                "postgres_uri": f"sqlite:///{os.path.join(self.test_data_path, 'databases', 'test_relationships.db')}",
-                "make_default": False,
-                "make_active": False
+                "name": self.memory_goat_name,
+                "type": "memory",
+                "description": "A test memory goat"
             }, 
             expected_status=201
         )
         assert "message" in response, "Response should contain message"
         assert "created successfully" in response["message"], "Message should indicate successful creation"
         assert "goat" in response, "Response should contain goat"
-        assert response["goat"]["name"] == self.mongopg_goat_name, "Goat name should match"
+        assert response["goat"]["name"] == self.memory_goat_name, "Goat name should match"
+
+    def test_make_active_rejected(self):
+        """make_active / make_default were removed in API v2 (ADR-016)."""
+        print("\n--- Test: make_active / make_default rejected ---")
+        for field in ("make_active", "make_default"):
+            self._request(
+                "POST",
+                "/api/goats",
+                json_data={"name": f"rejected_{int(time.time())}", "type": "memory", field: True},
+                expected_status=400
+            )
+
+    def test_status_api_version(self):
+        """GET /api/status reports api_version 2 and no active-goat fields."""
+        print("\n--- Test: Status api_version ---")
+        response = self._request("GET", "/api/status", expected_status=200)
+        assert response.get("api_version") == 2, "Server must report api_version 2"
+        assert "active_goat" not in response, "status must not report an active goat"
+
+    def test_removed_routes_return_410(self):
+        """Removed v1 routes return 410 Gone (ADR-016)."""
+        print("\n--- Test: Removed routes return 410 ---")
+        for method, path in [("GET", "/api/active-goat"), ("GET", "/api/nodes"),
+                             ("GET", "/api/relationships"), ("GET", "/api/graph")]:
+            response = self._request(method, path, expected_status=410)
+            assert response.get("api_version") == 2, "410 body should carry api_version"
+
+    def test_get_goat(self):
+        """GET /api/goats/<name> returns the goat's registry entry."""
+        print("\n--- Test: Get Goat ---")
+        response = self._request("GET", f"/api/goats/{self.text_goat_name}", expected_status=200)
+        assert response["name"] == self.text_goat_name, "Goat name should match"
+        assert response["type"] == "text", "Goat type should be text"
+        assert response["goatpath"] == os.path.join(
+            self.test_data_path, "goats", self.text_goat_name), "goatpath should match"
+        self._request("GET", "/api/goats/no_such_goat", expected_status=404)
+
+    def test_delete_memory_goat(self):
+        """Test deleting the memory goat."""
+        print("\n--- Test: Delete Memory Goat ---")
+        self._request("DELETE", f"/api/goats/{self.memory_goat_name}", expected_status=200)
+        self._request("GET", f"/api/goats/{self.memory_goat_name}", expected_status=404)
 
     def test_list_goats(self):
         """Test listing all goats."""
@@ -241,29 +285,9 @@ class MojoGOATAPITester:
         assert "goats" in response, "Response should contain goats"
         assert len(response["goats"]) == 2, "There should be two goats"
         assert any(goat["name"] == self.text_goat_name for goat in response["goats"]), f"Goat {self.text_goat_name} should be in the list"
-        assert any(goat["name"] == self.mongopg_goat_name for goat in response["goats"]), f"Goat {self.mongopg_goat_name} should be in the list"
-        assert response["default"] == self.text_goat_name, "Default goat should be the text goat"
-        assert response["active"] == self.text_goat_name, "Active goat should be the text goat"
-
-    def test_get_active_goat(self):
-        """Test getting the active goat."""
-        print("\n--- Test: Get Active Goat ---")
-        response = self._request("GET", "/api/active-goat", expected_status=200)
-        assert "active_goat" in response, "Response should contain active_goat"
-        assert response["active_goat"] == self.text_goat_name, f"Active goat should be {self.text_goat_name}"
-        assert "config" in response, "Response should contain config"
-
-    def test_set_active_goat(self):
-        """Test setting the active goat."""
-        print("\n--- Test: Set Active Goat ---")
-        response = self._request(
-            "POST", 
-            "/api/active-goat", 
-            json_data={"name": self.text_goat_name, "make_default": True}, 
-            expected_status=200
-        )
-        assert "message" in response, "Response should contain message"
-        assert f"Active goat set to '{self.text_goat_name}'" in response["message"], "Message should indicate successful setting"
+        assert any(goat["name"] == self.memory_goat_name for goat in response["goats"]), f"Goat {self.memory_goat_name} should be in the list"
+        assert "default" not in response and "active" not in response, \
+            "The registry has no active/default goat in API v2"
 
     # Node operations tests
     def test_create_node(self):
@@ -271,7 +295,7 @@ class MojoGOATAPITester:
         print("\n--- Test: Create Node ---")
         response = self._request(
             "POST", 
-            "/api/nodes", 
+            f"{self.scoped}/nodes", 
             json_data={
                 "nodeid": self.test_node_id1,
                 "nodename": "Test Node 1",
@@ -292,7 +316,7 @@ class MojoGOATAPITester:
         print("\n--- Test: Create Second Node ---")
         response = self._request(
             "POST", 
-            "/api/nodes", 
+            f"{self.scoped}/nodes", 
             json_data={
                 "nodeid": self.test_node_id2,
                 "nodename": "Test Node 2",
@@ -311,7 +335,7 @@ class MojoGOATAPITester:
     def test_get_node(self):
         """Test getting a node by ID."""
         print("\n--- Test: Get Node by ID ---")
-        response = self._request("GET", f"/api/nodes/{self.test_node_id1}", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/nodes/{self.test_node_id1}", expected_status=200)
         assert response["nodeid"] == self.test_node_id1, "Node ID should match"
         assert response["nodename"] == "Test Node 1", "Node name should match"
         assert set(response["labels"]) == set(["Person", "Employee"]), "Labels should match"
@@ -320,7 +344,7 @@ class MojoGOATAPITester:
     def test_get_nodes(self):
         """Test getting all nodes."""
         print("\n--- Test: Get All Nodes ---")
-        response = self._request("GET", "/api/nodes", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/nodes", expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 2, "There should be at least 2 nodes"
         node_ids = [node["nodeid"] for node in response]
@@ -330,7 +354,7 @@ class MojoGOATAPITester:
     def test_get_nodes_by_label(self):
         """Test getting nodes by label."""
         print("\n--- Test: Get Nodes by Label ---")
-        response = self._request("GET", "/api/nodes/label/Person", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/nodes/label/Person", expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 1, "There should be at least 1 node with label Person"
         node_ids = [node["nodeid"] for node in response]
@@ -341,7 +365,7 @@ class MojoGOATAPITester:
         print("\n--- Test: Update Node ---")
         response = self._request(
             "PUT", 
-            f"/api/nodes/{self.test_node_id1}", 
+            f"{self.scoped}/nodes/{self.test_node_id1}", 
             json_data={
                 "nodename": "Updated Test Node",
                 "description": "This is an updated test node",
@@ -361,7 +385,7 @@ class MojoGOATAPITester:
         print("\n--- Test: Create Relationship ---")
         response = self._request(
             "POST", 
-            "/api/relationships", 
+            f"{self.scoped}/relationships", 
             json_data={
                 "source": self.test_node_id1,
                 "target": self.test_node_id2,
@@ -381,7 +405,7 @@ class MojoGOATAPITester:
     def test_get_relationships(self):
         """Test getting all relationships."""
         print("\n--- Test: Get All Relationships ---")
-        response = self._request("GET", "/api/relationships", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/relationships", expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 1, "There should be at least 1 relationship"
         
@@ -403,7 +427,7 @@ class MojoGOATAPITester:
     def test_get_relationships_by_source(self):
         """Test getting relationships by source."""
         print("\n--- Test: Get Relationships by Source ---")
-        response = self._request("GET", "/api/relationships", params={"source": self.test_node_id1}, expected_status=200)
+        response = self._request("GET", f"{self.scoped}/relationships", params={"source": self.test_node_id1}, expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 1, "There should be at least 1 relationship from the source"
         
@@ -414,7 +438,7 @@ class MojoGOATAPITester:
     def test_get_relationships_by_target(self):
         """Test getting relationships by target."""
         print("\n--- Test: Get Relationships by Target ---")
-        response = self._request("GET", "/api/relationships", params={"target": self.test_node_id2}, expected_status=200)
+        response = self._request("GET", f"{self.scoped}/relationships", params={"target": self.test_node_id2}, expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 1, "There should be at least 1 relationship to the target"
         
@@ -425,7 +449,7 @@ class MojoGOATAPITester:
     def test_get_relationships_by_story(self):
         """Test getting relationships by story."""
         print("\n--- Test: Get Relationships by Story ---")
-        response = self._request("GET", "/api/relationships", params={"story": "WORKS_AT"}, expected_status=200)
+        response = self._request("GET", f"{self.scoped}/relationships", params={"story": "WORKS_AT"}, expected_status=200)
         assert isinstance(response, list), "Response should be a list"
         assert len(response) >= 1, "There should be at least 1 relationship with the story"
         
@@ -440,7 +464,7 @@ class MojoGOATAPITester:
             return
             
         print(f"\n--- Test: Get Relationship by ID ({self.test_relationship_id}) ---")
-        response = self._request("GET", f"/api/relationships/{self.test_relationship_id}", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/relationships/{self.test_relationship_id}", expected_status=200)
         assert response["source_id"] == self.test_node_id1, "Source ID should match"
         assert response["target_id"] == self.test_node_id2, "Target ID should match"
         assert response["story"] == "WORKS_AT", "Story should match"
@@ -449,7 +473,7 @@ class MojoGOATAPITester:
     def test_get_composition(self):
         """Test getting the composition of nodes by label."""
         print("\n--- Test: Get Composition ---")
-        response = self._request("GET", "/api/active-goat/composition", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/composition", expected_status=200)
         assert "Person" in response, "Composition should include Person"
         assert "Company" in response, "Composition should include Company"
         assert response["Person"] >= 1, "There should be at least 1 Person node"
@@ -458,7 +482,7 @@ class MojoGOATAPITester:
     def test_get_taxonomy(self):
         """Test getting the taxonomy of relationship types."""
         print("\n--- Test: Get Taxonomy ---")
-        response = self._request("GET", "/api/active-goat/taxonomy", expected_status=200)
+        response = self._request("GET", f"{self.scoped}/taxonomy", expected_status=200)
         assert "WORKS_AT" in response, "Taxonomy should include WORKS_AT"
         assert response["WORKS_AT"] >= 1, "There should be at least 1 WORKS_AT relationship"
 
@@ -468,7 +492,7 @@ class MojoGOATAPITester:
         dump_file = os.path.join(self.test_data_path, "relationships_dump.txt")
         response = self._request(
             "POST", 
-            "/api/active-goat/dump-relationships", 
+            f"{self.scoped}/dump-relationships", 
             json_data={"filename": dump_file}, 
             expected_status=200
         )
@@ -490,12 +514,12 @@ class MojoGOATAPITester:
             return
             
         print(f"\n--- Test: Delete Relationship ({self.test_relationship_id}) ---")
-        response = self._request("DELETE", f"/api/relationships/{self.test_relationship_id}", expected_status=200)
+        response = self._request("DELETE", f"{self.scoped}/relationships/{self.test_relationship_id}", expected_status=200)
         assert "message" in response, "Response should contain message"
         assert "deleted successfully" in response["message"], "Message should indicate successful deletion"
         
         # Verify relationship is deleted
-        relationships = self._request("GET", "/api/relationships", expected_status=200)
+        relationships = self._request("GET", f"{self.scoped}/relationships", expected_status=200)
         for rel in relationships:
             if "relationship_id" in rel and rel["relationship_id"] == self.test_relationship_id:
                 assert False, f"Relationship {self.test_relationship_id} should be deleted"
@@ -503,19 +527,19 @@ class MojoGOATAPITester:
     def test_delete_nodes(self):
         """Test deleting nodes."""
         print(f"\n--- Test: Delete Node ({self.test_node_id1}) ---")
-        response = self._request("DELETE", f"/api/nodes/{self.test_node_id1}", expected_status=200)
+        response = self._request("DELETE", f"{self.scoped}/nodes/{self.test_node_id1}", expected_status=200)
         assert "message" in response, "Response should contain message"
         assert "deleted successfully" in response["message"], "Message should indicate successful deletion"
         
         print(f"\n--- Test: Delete Node ({self.test_node_id2}) ---")
-        response = self._request("DELETE", f"/api/nodes/{self.test_node_id2}", expected_status=200)
+        response = self._request("DELETE", f"{self.scoped}/nodes/{self.test_node_id2}", expected_status=200)
         assert "message" in response, "Response should contain message"
         assert "deleted successfully" in response["message"], "Message should indicate successful deletion"
         
         # Verify nodes are deleted
         for node_id in [self.test_node_id1, self.test_node_id2]:
             try:
-                self._request("GET", f"/api/nodes/{node_id}", expected_status=404)
+                self._request("GET", f"{self.scoped}/nodes/{node_id}", expected_status=404)
             except:
                 # If the request doesn't return 404, the node wasn't properly deleted
                 print(f"  WARNING: Node {node_id} might not be properly deleted")

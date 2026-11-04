@@ -1,52 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Tests for the MojoGOAT API CRUD operations
+Tests for the MojoGOAT API CRUD operations (goat-scoped routes, API v2 / ADR-016)
 """
 
 import unittest
 import json
 import os
-import tempfile
-import shutil
-from datetime import datetime
 
-import sys
-sys.path.append("/xpal-src/mojogoat")
+from api_support import ApiEnv
 
-from mojogoatapi import app, initialize_app, registry_path, active_goat
+GOAT = "test_text_goat"
+BASE = f"/api/goats/{GOAT}"
+
 
 class MojoGoatAPICRUDTestCase(unittest.TestCase):
-    """Test case for the MojoGOAT API CRUD operations"""
+    """Test case for the MojoGOAT API CRUD operations (goat-scoped, ADR-016)"""
     
     def setUp(self):
-        """Set up test environment"""
-        app.config['TESTING'] = True
-        app.config['DEBUG'] = False
-        
-        # Create a temporary directory for testing
-        self.test_dir = tempfile.mkdtemp()
-        
-        # Create a temporary registry file
-        self.registry_file = os.path.join(self.test_dir, "test_registry.json")
-        
-        # Initialize the app with the test registry and clear any previous state
-        app.config['TESTING'] = True  # Important for avoiding Flask errors
-        
-        # Reset globals in mojogoatapi by reimporting
-        from mojogoatapi import active_goat, active_goat_name
-        
-        # Use direct assignment through mojogoatapi module
-        import mojogoatapi
-        mojogoatapi.active_goat = None
-        mojogoatapi.active_goat_name = None
-        
-        initialize_app(self.registry_file)
-        
-        self.client = app.test_client()
+        """Set up test environment: temp registry/ops/data dirs and one text goat"""
+        self.env = ApiEnv().start()
+        self.client = self.env.client
+        self.test_dir = self.env.root
         
         # Create a text goat for testing
-        goat_dir = os.path.join(self.test_dir, "test_text_goat")
+        goat_dir = os.path.join(self.test_dir, GOAT)
         os.makedirs(goat_dir, exist_ok=True)
         os.makedirs(os.path.join(goat_dir, "nodes"), exist_ok=True)
         os.makedirs(os.path.join(goat_dir, "snapshots"), exist_ok=True)
@@ -58,11 +36,9 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             f.write("")
         
         data = {
-            "name": "test_text_goat",
+            "name": GOAT,
             "type": "text",
-            "goat_path": goat_dir,
-            "make_default": True,
-            "make_active": True
+            "goat_path": goat_dir
         }
         
         response = self.client.post('/api/goats', json=data)
@@ -70,8 +46,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
     
     def tearDown(self):
         """Clean up test environment"""
-        # Remove the temporary directory and all its contents
-        shutil.rmtree(self.test_dir)
+        self.env.stop()
     
     def test_node_crud(self):
         """Test CRUD operations for nodes"""
@@ -83,7 +58,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "description": "This is a test node"
         }
         
-        response = self.client.post('/api/nodes', json=node_data)
+        response = self.client.post(f'{BASE}/nodes', json=node_data)
         self.assertEqual(response.status_code, 201)
         
         data = json.loads(response.data)
@@ -93,7 +68,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data.get('description'), "This is a test node")
         
         # Get the node
-        response = self.client.get('/api/nodes/test_node1')
+        response = self.client.get(f'{BASE}/nodes/test_node1')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -108,7 +83,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "description": "This is an updated test node"
         }
         
-        response = self.client.put('/api/nodes/test_node1', json=update_data)
+        response = self.client.put(f'{BASE}/nodes/test_node1', json=update_data)
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -118,7 +93,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data.get('description'), "This is an updated test node")
         
         # Get all nodes
-        response = self.client.get('/api/nodes')
+        response = self.client.get(f'{BASE}/nodes')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -126,7 +101,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data[0].get('nodeid'), "test_node1")
         
         # Get nodes by label
-        response = self.client.get('/api/nodes/label/Test')
+        response = self.client.get(f'{BASE}/nodes/label/Test')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -134,11 +109,11 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data[0].get('nodeid'), "test_node1")
         
         # Delete the node
-        response = self.client.delete('/api/nodes/test_node1')
+        response = self.client.delete(f'{BASE}/nodes/test_node1')
         self.assertEqual(response.status_code, 200)
         
         # Verify the node is deleted
-        response = self.client.get('/api/nodes/test_node1')
+        response = self.client.get(f'{BASE}/nodes/test_node1')
         self.assertEqual(response.status_code, 404)
     
     def test_relationship_crud(self):
@@ -156,8 +131,8 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "labels": ["Test", "Node"]
         }
         
-        self.client.post('/api/nodes', json=node1_data)
-        self.client.post('/api/nodes', json=node2_data)
+        self.client.post(f'{BASE}/nodes', json=node1_data)
+        self.client.post(f'{BASE}/nodes', json=node2_data)
         
         # Create a relationship
         rel_data = {
@@ -166,7 +141,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "story": "RELATES_TO"
         }
         
-        response = self.client.post('/api/relationships', json=rel_data)
+        response = self.client.post(f'{BASE}/relationships', json=rel_data)
         self.assertEqual(response.status_code, 201)
         
         data = json.loads(response.data)
@@ -175,7 +150,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data.get('story'), "RELATES_TO")
         
         # Get all relationships
-        response = self.client.get('/api/relationships')
+        response = self.client.get(f'{BASE}/relationships')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -187,7 +162,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         # Get relationship by ID
         rel_id = data[0].get('relationship_id')
         
-        response = self.client.get(f'/api/relationships/{rel_id}')
+        response = self.client.get(f'{BASE}/relationships/{rel_id}')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -196,7 +171,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data.get('story'), "RELATES_TO")
         
         # Get relationships by source
-        response = self.client.get('/api/relationships?source=test_node1')
+        response = self.client.get(f'{BASE}/relationships?source=test_node1')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -204,7 +179,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data[0].get('source_id'), "test_node1")
         
         # Get relationships by target
-        response = self.client.get('/api/relationships?target=test_node2')
+        response = self.client.get(f'{BASE}/relationships?target=test_node2')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -212,7 +187,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data[0].get('target_id'), "test_node2")
         
         # Get relationships by story
-        response = self.client.get('/api/relationships?story=RELATES_TO')
+        response = self.client.get(f'{BASE}/relationships?story=RELATES_TO')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -220,11 +195,11 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data[0].get('story'), "RELATES_TO")
         
         # Delete the relationship
-        response = self.client.delete(f'/api/relationships/{rel_id}')
+        response = self.client.delete(f'{BASE}/relationships/{rel_id}')
         self.assertEqual(response.status_code, 200)
         
         # Verify the relationship is deleted
-        response = self.client.get('/api/relationships')
+        response = self.client.get(f'{BASE}/relationships')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -245,8 +220,8 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "labels": ["Company", "Organization"]
         }
         
-        self.client.post('/api/nodes', json=node1_data)
-        self.client.post('/api/nodes', json=node2_data)
+        self.client.post(f'{BASE}/nodes', json=node1_data)
+        self.client.post(f'{BASE}/nodes', json=node2_data)
         
         rel_data = {
             "source": "test_node1",
@@ -254,10 +229,10 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
             "story": "WORKS_AT"
         }
         
-        self.client.post('/api/relationships', json=rel_data)
+        self.client.post(f'{BASE}/relationships', json=rel_data)
         
         # Get composition
-        response = self.client.get('/api/active-goat/composition')
+        response = self.client.get(f'{BASE}/composition')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -267,7 +242,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         self.assertEqual(data.get('Organization'), 1)
         
         # Get taxonomy
-        response = self.client.get('/api/active-goat/taxonomy')
+        response = self.client.get(f'{BASE}/taxonomy')
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)
@@ -276,7 +251,7 @@ class MojoGoatAPICRUDTestCase(unittest.TestCase):
         # Dump relationships
         dump_file = os.path.join(self.test_dir, "relationships_dump.txt")
         
-        response = self.client.post('/api/active-goat/dump-relationships', json={"filename": dump_file})
+        response = self.client.post(f'{BASE}/dump-relationships', json={"filename": dump_file})
         self.assertEqual(response.status_code, 200)
         
         data = json.loads(response.data)

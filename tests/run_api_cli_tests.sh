@@ -51,12 +51,21 @@ echo "==============================="
 # Ensure the API server is running
 if ! curl -s "$API_URL/api/registry" > /dev/null; then
   echo "ERROR: MojoGOAT API server is not running at $API_URL"
-  echo "Start the server with: python mojogoatapi.py"
+  echo "Start the server with: uv run --frozen --extra dev python mojogoatapi.py --port <port>"
+  exit 1
+fi
+
+# These tests create goats and switch the server's registry (POST /api/registry), so only point
+# them at a throwaway server started with temp MOJOGOAT_REGISTRY / MOJOGOAT_DATA state.
+# The server must speak API v2 (ADR-016): GET /api/status reports api_version 2.
+if ! curl -s "$API_URL/api/status" | grep -Eq '"api_version": *2'; then
+  echo "ERROR: server at $API_URL does not report api_version 2 (goat-scoped API, ADR-016)"
   exit 1
 fi
 
 # Run the API CLI tests
-CMD="python test_api_cli.py --url $API_URL --test-data-path $TEST_DATA_PATH"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CMD="python $SCRIPT_DIR/test_api_cli.py --url $API_URL --test-data-path $TEST_DATA_PATH"
 if [ "$KEEP_DATA" = true ]; then
   CMD="$CMD --keep-data"
 fi

@@ -48,7 +48,7 @@
                   "    pm.expect(responseJson.goat.type).to.eql(\"text\");",
                   "    ",
                   "    // Store goat name for later tests",
-                  "    pm.environment.set(\"textGoatName\", responseJson.goat.name);",
+                  "    pm.environment.set(\"goat\", responseJson.goat.name);",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -66,7 +66,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"test_text_goat\",\n    \"type\": \"text\",\n    \"description\": \"A test text goat\",\n    \"goat_path\": \"{{testDataPath}}/goats/test_text_goat\",\n    \"make_default\": true,\n    \"make_active\": true\n}"
+              "raw": "{\n    \"name\": \"test_text_goat\",\n    \"type\": \"text\",\n    \"description\": \"A test text goat\",\n    \"goat_path\": \"{{testDataPath}}/goats/test_text_goat\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/goats",
@@ -78,7 +78,7 @@
           "response": []
         },
         {
-          "name": "Create MongoDB+PostgreSQL Goat",
+          "name": "Create Memory Goat",
           "event": [
             {
               "listen": "test",
@@ -92,11 +92,8 @@
                   "    const responseJson = pm.response.json();",
                   "    pm.expect(responseJson.message).to.include(\"created successfully\");",
                   "    pm.expect(responseJson.goat).to.be.an('object');",
-                  "    pm.expect(responseJson.goat.name).to.eql(\"test_mongopg_goat\");",
-                  "    pm.expect(responseJson.goat.type).to.eql(\"mongopg\");",
-                  "    ",
-                  "    // Store goat name for later tests",
-                  "    pm.environment.set(\"mongopgGoatName\", responseJson.goat.name);",
+                  "    pm.expect(responseJson.goat.name).to.eql(\"test_memory_goat\");",
+                  "    pm.expect(responseJson.goat.type).to.eql(\"memory\");",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -114,14 +111,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"test_mongopg_goat\",\n    \"type\": \"mongopg\",\n    \"description\": \"A test MongoDB+PostgreSQL goat\",\n    \"mongodb_uri\": \"mongodb://localhost/test_mongopg_goat\",\n    \"postgres_uri\": \"sqlite:///{{testDataPath}}/databases/test_relationships.db\",\n    \"make_default\": false,\n    \"make_active\": false\n}"
+              "raw": "{\n    \"name\": \"test_memory_goat\",\n    \"type\": \"memory\",\n    \"description\": \"A test memory goat\",\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/goats",
               "host": ["{{baseUrl}}"],
               "path": ["api", "goats"]
             },
-            "description": "Create a new MongoDB+PostgreSQL goat"
+            "description": "Create a new memory goat (second goat; never addressed by the data routes below)"
           },
           "response": []
         },
@@ -204,129 +201,6 @@
             "description": "Set a new registry path"
           },
           "response": []
-        },
-        {
-          "name": "Get Active Goat",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response has active goat data\", function () {",
-                  "    const responseJson = pm.response.json();",
-                  "    pm.expect(responseJson.active_goat).to.be.a('string');",
-                  "    pm.expect(responseJson.config).to.be.an('object');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/active-goat",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat"]
-            },
-            "description": "Get the currently active goat"
-          },
-          "response": []
-        },
-        {
-          "name": "Set Active Goat",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response has active goat data\", function () {",
-                  "    const responseJson = pm.response.json();",
-                  "    pm.expect(responseJson.message).to.include(\"Active goat set to\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"name\": \"{{mongopgGoatName}}\",\n    \"make_default\": true\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/active-goat",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat"]
-            },
-            "description": "Set the active goat"
-          },
-          "response": []
-        },
-        {
-          "name": "Set Text Goat as Active",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test(\"Response has active goat data\", function () {",
-                  "    const responseJson = pm.response.json();",
-                  "    pm.expect(responseJson.message).to.include(\"Active goat set to\");",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"name\": \"{{textGoatName}}\",\n    \"make_default\": true\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/active-goat",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat"]
-            },
-            "description": "Set the text goat as active"
-          },
-          "response": []
         }
       ],
       "description": "Endpoints for managing goats"
@@ -364,11 +238,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/nodes",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes"]
+              "path": ["api", "goats", "{{goat}}", "nodes"]
             },
-            "description": "Get all nodes from the active goat"
+            "description": "Get all nodes from the goat"
           },
           "response": []
         },
@@ -411,9 +285,9 @@
               "raw": "{\n    \"nodeid\": \"test_node1\",\n    \"nodename\": \"Test Node 1\",\n    \"labels\": [\"Person\", \"Employee\"],\n    \"description\": \"This is a test node\",\n    \"age\": 30,\n    \"department\": \"Engineering\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/nodes",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes"]
+              "path": ["api", "goats", "{{goat}}", "nodes"]
             },
             "description": "Create a new node"
           },
@@ -458,9 +332,9 @@
               "raw": "{\n    \"nodeid\": \"test_node2\",\n    \"nodename\": \"Test Node 2\",\n    \"labels\": [\"Company\", \"Organization\"],\n    \"description\": \"This is a test company node\",\n    \"founded\": 2010,\n    \"industry\": \"Technology\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/nodes",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes"]
+              "path": ["api", "goats", "{{goat}}", "nodes"]
             },
             "description": "Create a second node for relationship testing"
           },
@@ -499,9 +373,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes/{{testNodeId1}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes", "{{testNodeId1}}"]
+              "path": ["api", "goats", "{{goat}}", "nodes", "{{testNodeId1}}"]
             },
             "description": "Get a node by ID"
           },
@@ -542,9 +416,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/nodes/label/Person",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes/label/Person",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes", "label", "Person"]
+              "path": ["api", "goats", "{{goat}}", "nodes", "label", "Person"]
             },
             "description": "Get nodes by label"
           },
@@ -588,9 +462,9 @@
               "raw": "{\n    \"nodename\": \"Updated Test Node\",\n    \"description\": \"This is an updated test node\",\n    \"title\": \"Senior Engineer\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes/{{testNodeId1}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes", "{{testNodeId1}}"]
+              "path": ["api", "goats", "{{goat}}", "nodes", "{{testNodeId1}}"]
             },
             "description": "Update a node"
           },
@@ -643,9 +517,9 @@
               "raw": "{\n    \"source\": \"{{testNodeId1}}\",\n    \"target\": \"{{testNodeId2}}\",\n    \"story\": \"WORKS_AT\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/relationships",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships"]
+              "path": ["api", "goats", "{{goat}}", "relationships"]
             },
             "description": "Create a new relationship"
           },
@@ -682,9 +556,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships"]
+              "path": ["api", "goats", "{{goat}}", "relationships"]
             },
             "description": "Get all relationships"
           },
@@ -726,9 +600,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships?source={{testNodeId1}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships?source={{testNodeId1}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships"],
+              "path": ["api", "goats", "{{goat}}", "relationships"],
               "query": [
                 {
                   "key": "source",
@@ -776,9 +650,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships?target={{testNodeId2}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships?target={{testNodeId2}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships"],
+              "path": ["api", "goats", "{{goat}}", "relationships"],
               "query": [
                 {
                   "key": "target",
@@ -826,9 +700,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships?story=WORKS_AT",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships?story=WORKS_AT",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships"],
+              "path": ["api", "goats", "{{goat}}", "relationships"],
               "query": [
                 {
                   "key": "story",
@@ -872,9 +746,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships/{{testRelationshipId}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships/{{testRelationshipId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships", "{{testRelationshipId}}"]
+              "path": ["api", "goats", "{{goat}}", "relationships", "{{testRelationshipId}}"]
             },
             "description": "Get a relationship by ID"
           },
@@ -918,9 +792,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/active-goat/composition",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/composition",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat", "composition"]
+              "path": ["api", "goats", "{{goat}}", "composition"]
             },
             "description": "Get the composition of nodes by label"
           },
@@ -957,9 +831,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/active-goat/taxonomy",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/taxonomy",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat", "taxonomy"]
+              "path": ["api", "goats", "{{goat}}", "taxonomy"]
             },
             "description": "Get the taxonomy of relationship types"
           },
@@ -999,9 +873,9 @@
               "raw": "{\n    \"filename\": \"{{testDataPath}}/relationships_dump.txt\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/active-goat/dump-relationships",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/dump-relationships",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "active-goat", "dump-relationships"]
+              "path": ["api", "goats", "{{goat}}", "dump-relationships"]
             },
             "description": "Dump all relationships to a file"
           },
@@ -1043,9 +917,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/relationships/{{testRelationshipId}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/relationships/{{testRelationshipId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "relationships", "{{testRelationshipId}}"]
+              "path": ["api", "goats", "{{goat}}", "relationships", "{{testRelationshipId}}"]
             },
             "description": "Delete a relationship"
           },
@@ -1081,9 +955,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/nodes/{{testNodeId1}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes/{{testNodeId1}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes", "{{testNodeId1}}"]
+              "path": ["api", "goats", "{{goat}}", "nodes", "{{testNodeId1}}"]
             },
             "description": "Delete a node"
           },
@@ -1119,9 +993,9 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/nodes/{{testNodeId2}}",
+              "raw": "{{baseUrl}}/api/goats/{{goat}}/nodes/{{testNodeId2}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "nodes", "{{testNodeId2}}"]
+              "path": ["api", "goats", "{{goat}}", "nodes", "{{testNodeId2}}"]
             },
             "description": "Delete a node"
           },
@@ -1163,13 +1037,8 @@
       "type": "string"
     },
     {
-      "key": "textGoatName",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "mongopgGoatName",
-      "value": "",
+      "key": "goat",
+      "value": "test_text_goat",
       "type": "string"
     },
     {

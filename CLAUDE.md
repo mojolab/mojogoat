@@ -115,6 +115,20 @@ Query by story: `MATCH (a)-[r:is_connected_to]->(b) WHERE 'navigated to' IN r.st
 
 ---
 
+## API Model — No Active Goat (ADR-016)
+
+**Status: implemented 2026-11-01 on branch `feat/goat-scoped-routes` (v0.4.0, unreleased, not yet
+committed).** A server started from older code still has the v1 active-goat behaviour; check
+`api_version` in `GET /api/status` (2 = scoped).
+
+Target model: there is no "active goat". Every goat-level route is `/api/goats/<goat>/…`, the
+server keeps no per-client or server-wide current-goat state, and the registry has no `active` or
+`default` field. Removed routes return `410 Gone`. `GET /api/status` reports `api_version: 2` and
+clients must refuse older servers. Spec: `docs/api-v2-goat-scoped.md`. Do not add new code that
+reads or writes an `active_goat` global, and do not reintroduce a compatibility mode.
+
+---
+
 ## Verification Before Done
 
 - Run tests before marking anything complete: `uv run pytest tests/`
@@ -146,7 +160,8 @@ needs `claudia` on `PATH`). Enable it with: `git config core.hooksPath .githooks
 
 ## What Not To Touch
 
-- `mojogoatapi.py` — Flask REST API, not used by Xetrapal. Do not break its interface.
+- `mojogoatapi.py` — Flask REST API (used by Xetrapal and `mojogoat-ui` over HTTP). Do not change
+  its interface except as specified by ADR-016 (goat-scoped routes, removal of the active goat).
 - `mojogoat/goatbases/mongogoat/` — deferred. Do not touch until TextGoat and Neo4jGoat are stable.
 - `neo4jgoat.py` — already retired as a stub. Do not resurrect py2neo.
 - `/xpal-src/xetrapal3/` — sibling Xetrapal repo. Do not modify without explicit instruction.
