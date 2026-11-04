@@ -117,8 +117,8 @@ Query by story: `MATCH (a)-[r:is_connected_to]->(b) WHERE 'navigated to' IN r.st
 
 ## API Model — No Active Goat (ADR-016)
 
-**Status: implemented 2026-11-01 on branch `feat/goat-scoped-routes` (v0.4.0, unreleased, not yet
-committed).** A server started from older code still has the v1 active-goat behaviour; check
+**Status: implemented 2026-11-01 on branch `feat/goat-scoped-routes` (v0.4.0, committed and tagged
+locally 2026-11-04, not yet pushed).** A server started from older code still has the v1 active-goat behaviour; check
 `api_version` in `GET /api/status` (2 = scoped).
 
 Target model: there is no "active goat". Every goat-level route is `/api/goats/<goat>/…`, the
