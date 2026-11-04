@@ -1,13 +1,17 @@
 import asyncio
+import logging
 import os
 import json
 import re
 import secrets
 import string
+import threading
 from datetime import datetime
 from uuid import uuid5, NAMESPACE_URL
 
 import aiofiles
+
+logger = logging.getLogger(__name__)
 
 _ID_ALPHABET = string.ascii_letters + string.digits  # base-62
 
@@ -19,10 +23,32 @@ def _short_id(n: int = 10) -> str:
 from .base import GoatBase, REL_IDENTITY, format_dump_line
 
 # Per-goatpath locks guarding the relationship read-modify-write sequence
-# (create/update/delete). Keyed by goatpath rather than per-instance so that
-# any two TextGoat instances pointing at the same directory are serialized,
-# while writes to different goats never block each other.
-_REL_WRITE_LOCKS: dict[str, asyncio.Lock] = {}
+# (create/update/delete/compact/import). Keyed by goatpath rather than per-instance so
+# that any two TextGoat instances pointing at the same directory are serialized, while
+# writes to different goats never block each other.
+#
+# These are threading.Locks, not asyncio.Locks: the Flask server runs each request on
+# its own thread with its own event loop, and an asyncio.Lock is bound to one loop
+# (waiters released from another loop are never woken, so requests stall and time out).
+# The critical sections do plain file I/O with no ``await`` inside, so holding a
+# threading.Lock cannot deadlock two coroutines on the same loop.
+_REL_WRITE_LOCKS: dict[str, threading.Lock] = {}
+_REL_WRITE_LOCKS_GUARD = threading.Lock()
+
+
+def _atomic_write(path: str, text: str, tmp_dir: str) -> None:
+    """Write *text* to *path* so readers see the old or the new content, never a partial file."""
+    tmp = os.path.join(tmp_dir, f".tmp-{os.getpid()}-{threading.get_ident()}-{_short_id(6)}")
+    try:
+        with open(tmp, "w") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
 
 
 class TextGoat(GoatBase):
@@ -52,13 +78,10 @@ class TextGoat(GoatBase):
     def _node_path(self, nodeid: str) -> str:
         return os.path.join(self.goatpath, "nodes", nodeid)
 
-    def _rel_write_lock(self) -> asyncio.Lock:
-        """Return the asyncio.Lock guarding relationship writes for this goatpath."""
-        lock = _REL_WRITE_LOCKS.get(self.goatpath)
-        if lock is None:
-            lock = asyncio.Lock()
-            _REL_WRITE_LOCKS[self.goatpath] = lock
-        return lock
+    def _rel_write_lock(self) -> threading.Lock:
+        """Return the threading.Lock guarding relationship writes for this goatpath."""
+        with _REL_WRITE_LOCKS_GUARD:
+            return _REL_WRITE_LOCKS.setdefault(self.goatpath, threading.Lock())
 
     def _rel_id_from_line(self, line: str, parts: list[str]) -> str:
         """Return the relationship UUID for a .gq line.
@@ -70,29 +93,46 @@ class TextGoat(GoatBase):
             return parts[4]
         return str(uuid5(NAMESPACE_URL, "|".join(parts[:4])))
 
-    async def _read_rel_lines(self) -> list[str]:
-        """Return raw (non-empty) lines from the current snapshot file."""
+    def _read_rel_lines_sync(self) -> list[str]:
+        """Return raw (non-empty) lines from the current snapshot file.
+
+        Snapshots are write-once and the pointer file is replaced atomically, so a read
+        never sees a partial file. If a compaction removes the snapshot between reading the
+        pointer and opening it, re-read the pointer once.
+        """
         ref_path = os.path.join(self.goatpath, "goatrels.gq")
-        async with aiofiles.open(ref_path, "r") as f:
-            relfile = (await f.read()).strip()
-        if not relfile:
-            return []
-        snapshot_path = os.path.join(self.goatpath, relfile)
-        if not os.path.exists(snapshot_path):
-            return []
-        async with aiofiles.open(snapshot_path, "r") as f:
-            content = await f.read()
-        return [ln for ln in content.split("\n") if ln.strip()]
+        for _ in range(2):
+            with open(ref_path, "r") as f:
+                relfile = f.read().strip()
+            if not relfile:
+                return []
+            try:
+                with open(os.path.join(self.goatpath, relfile), "r") as f:
+                    content = f.read()
+            except FileNotFoundError:
+                continue
+            return [ln for ln in content.split("\n") if ln.strip()]
+        return []
+
+    def _write_rel_lines_sync(self, lines: list[str]) -> None:
+        """Persist *lines* as a new snapshot and atomically repoint the reference file."""
+        snapshot_name = f"mojogoat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}"
+        if os.path.exists(os.path.join(self.goatpath, "snapshots", snapshot_name)):
+            snapshot_name += f"-{_short_id(4)}"
+        snapshot_path = os.path.join(self.goatpath, "snapshots", snapshot_name)
+        _atomic_write(snapshot_path, "\n".join(lines), self.goatpath)
+        _atomic_write(
+            os.path.join(self.goatpath, "goatrels.gq"),
+            os.path.join("snapshots", snapshot_name),
+            self.goatpath,
+        )
+
+    async def _read_rel_lines(self) -> list[str]:
+        return await asyncio.to_thread(self._read_rel_lines_sync)
 
     async def _write_rel_lines(self, lines: list[str]) -> None:
-        """Persist *lines* as a new snapshot and update the reference file."""
-        snapshot_name = f"mojogoat-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S-%f')}"
-        snapshot_path = os.path.join(self.goatpath, "snapshots", snapshot_name)
-        ref_path = os.path.join(self.goatpath, "goatrels.gq")
-        async with aiofiles.open(snapshot_path, "w") as f:
-            await f.write("\n".join(lines))
-        async with aiofiles.open(ref_path, "w") as f:
-            await f.write(os.path.join("snapshots", snapshot_name))
+        """Unlocked write; callers doing read-modify-write must use the locked helpers."""
+        await asyncio.to_thread(self._write_rel_lines_sync, lines)
 
     # ------------------------------------------------------------------
     # Node CRUD
@@ -130,8 +170,9 @@ class TextGoat(GoatBase):
             except (json.JSONDecodeError, Exception):
                 pass
 
-        async with aiofiles.open(node_path, 'w') as f:
-            await f.write(json.dumps(node_data, indent=2))
+        await asyncio.to_thread(
+            _atomic_write, node_path, json.dumps(node_data, indent=2), self.goatpath
+        )
 
         return node_data
 
@@ -291,11 +332,14 @@ class TextGoat(GoatBase):
             if props:
                 line += f"|{json.dumps(props, separators=(',', ':'))}"
 
-            async with self._rel_write_lock():
-                lines = await self._read_rel_lines()
-                if line not in lines:
-                    lines.append(line)
-                await self._write_rel_lines(lines)
+            def _append() -> None:
+                with self._rel_write_lock():
+                    lines = self._read_rel_lines_sync()
+                    if line not in lines:
+                        lines.append(line)
+                    self._write_rel_lines_sync(lines)
+
+            await asyncio.to_thread(_append)
 
             return {
                 "source_id": source,
@@ -306,27 +350,32 @@ class TextGoat(GoatBase):
                 **props,
             }
         except Exception:
+            logger.exception("create_relationship failed in goat %s", self.goatname)
             return None
 
     async def delete_relationship(self, relationship_id: str) -> bool:
         """Delete a relationship by its UUID. Returns True on success."""
         try:
-            async with self._rel_write_lock():
-                lines = await self._read_rel_lines()
-                new_lines = []
-                found = False
-                for line in lines:
-                    parts = line.split("|")
-                    rid = self._rel_id_from_line(line, parts)
-                    if rid == relationship_id:
-                        found = True
-                    else:
-                        new_lines.append(line)
-                if not found:
-                    return False
-                await self._write_rel_lines(new_lines)
-            return True
+            def _delete() -> bool:
+                with self._rel_write_lock():
+                    lines = self._read_rel_lines_sync()
+                    new_lines = []
+                    found = False
+                    for line in lines:
+                        parts = line.split("|")
+                        rid = self._rel_id_from_line(line, parts)
+                        if rid == relationship_id:
+                            found = True
+                        else:
+                            new_lines.append(line)
+                    if not found:
+                        return False
+                    self._write_rel_lines_sync(new_lines)
+                    return True
+
+            return await asyncio.to_thread(_delete)
         except Exception:
+            logger.exception("delete_relationship failed in goat %s", self.goatname)
             return False
 
     async def update_relationship_props(self, relationship_id: str, **props) -> bool:
@@ -336,30 +385,34 @@ class TextGoat(GoatBase):
         changed — only the extra properties are updated.
         """
         try:
-            async with self._rel_write_lock():
-                lines = await self._read_rel_lines()
-                new_lines = []
-                found = False
-                for line in lines:
-                    parts = line.split("|")
-                    rid = self._rel_id_from_line(line, parts)
-                    if rid == relationship_id:
-                        found = True
-                        existing_props: dict = {}
-                        if len(parts) >= 6:
-                            try:
-                                existing_props = json.loads("|".join(parts[5:]))
-                            except (json.JSONDecodeError, ValueError):
-                                pass
-                        existing_props.update(props)
-                        base = "|".join(parts[:5])
-                        line = f"{base}|{json.dumps(existing_props, separators=(',', ':'))}"
-                    new_lines.append(line)
-                if not found:
-                    return False
-                await self._write_rel_lines(new_lines)
-            return True
+            def _update() -> bool:
+                with self._rel_write_lock():
+                    lines = self._read_rel_lines_sync()
+                    new_lines = []
+                    found = False
+                    for line in lines:
+                        parts = line.split("|")
+                        rid = self._rel_id_from_line(line, parts)
+                        if rid == relationship_id:
+                            found = True
+                            existing_props: dict = {}
+                            if len(parts) >= 6:
+                                try:
+                                    existing_props = json.loads("|".join(parts[5:]))
+                                except (json.JSONDecodeError, ValueError):
+                                    pass
+                            existing_props.update(props)
+                            base = "|".join(parts[:5])
+                            line = f"{base}|{json.dumps(existing_props, separators=(',', ':'))}"
+                        new_lines.append(line)
+                    if not found:
+                        return False
+                    self._write_rel_lines_sync(new_lines)
+                    return True
+
+            return await asyncio.to_thread(_update)
         except Exception:
+            logger.exception("update_relationship_props failed in goat %s", self.goatname)
             return False
 
     # ------------------------------------------------------------------
@@ -387,23 +440,25 @@ class TextGoat(GoatBase):
 
         Returns the number of relationships preserved.
         """
-        lines = await self._read_rel_lines()
-        await self._write_rel_lines(lines)
+        def _compact() -> int:
+            with self._rel_write_lock():
+                lines = self._read_rel_lines_sync()
+                self._write_rel_lines_sync(lines)
 
-        ref_path = os.path.join(self.goatpath, 'goatrels.gq')
-        async with aiofiles.open(ref_path, 'r') as f:
-            current_rel = (await f.read()).strip()
-        current_name = os.path.basename(current_rel)
+                ref_path = os.path.join(self.goatpath, 'goatrels.gq')
+                with open(ref_path, 'r') as f:
+                    current_name = os.path.basename(f.read().strip())
 
-        snapshots_dir = os.path.join(self.goatpath, 'snapshots')
-        for fname in os.listdir(snapshots_dir):
-            if fname != current_name:
-                try:
-                    os.remove(os.path.join(snapshots_dir, fname))
-                except Exception:
-                    pass
+                snapshots_dir = os.path.join(self.goatpath, 'snapshots')
+                for fname in os.listdir(snapshots_dir):
+                    if fname != current_name:
+                        try:
+                            os.remove(os.path.join(snapshots_dir, fname))
+                        except Exception:
+                            pass
+                return len(lines)
 
-        return len(lines)
+        return await asyncio.to_thread(_compact)
 
     async def dump_all_rels(self, filename: str) -> int:
         """Dump all relationships to *filename* in pipe-delimited format.
@@ -510,9 +565,13 @@ class TextGoat(GoatBase):
     async def add_rels(self, newrels: list[str]) -> str:
         """Append raw pipe-delimited relationship strings (legacy import path)."""
         try:
-            lines = await self._read_rel_lines()
-            combined = list(set(lines + newrels))
-            await self._write_rel_lines(combined)
-            return f"Added {len(newrels)} relationships. Total: {len(combined)}"
+            def _add() -> int:
+                with self._rel_write_lock():
+                    combined = list(set(self._read_rel_lines_sync() + newrels))
+                    self._write_rel_lines_sync(combined)
+                    return len(combined)
+
+            total = await asyncio.to_thread(_add)
+            return f"Added {len(newrels)} relationships. Total: {total}"
         except Exception as e:
             return str(e)
